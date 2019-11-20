@@ -3,7 +3,7 @@
 - This repository will be filled with codes reproducing some DRL algos I'm interested in.
 - Main library: PyTorch
 
-### Algorithms
+### Algorithms to Implement
 - [ ] DQN
 - [ ] DDPG
 - [ ] PDQN_Discrete (Prioritized)
