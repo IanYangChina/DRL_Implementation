@@ -67,6 +67,14 @@ class Env(object):
         self.input_min = np.array(([1, 1, 1, 1]+[0 for k in range(len(self.keys))]), dtype=np.float)
 
     def reset(self, all_goal=False, single=False, act_test=False):
+        """
+        Every time an episode ends, call this function.
+
+        :param all_goal:  If True, all of the goals are possible to be the high level agent's desired goal.
+        :param single:    If True, the high level agent only pursue one fixed goal
+        :param act_test:  If True, this function only return low level observations (used for test the low level agent)
+        :return:          Initial observations
+        """
         self.world_running = dcp(self.world)
         self.keys_running = dcp(self.keys)
         x, y = r.randint(1, self.init_room_width), r.randint(1, self.init_room_height)
@@ -98,7 +106,11 @@ class Env(object):
             return act_observation
 
     def step(self, opt_obs, act_obs, action):
-        # system steps with a primitive action
+        """
+        System steps with a primitive action.
+
+        :return: New observations, rewards, terminal flags
+        """
         act_observation = dcp(act_obs)
         act_observation_ = dcp(act_observation)
         s, ag, ag_loc, inv, inv_vec = self._move_agent(act_observation, action)
@@ -128,6 +140,11 @@ class Env(object):
             return act_observation_, act_reward, ep_done, opt_observation_, opt_reward, opt_done
 
     def _move_agent(self, observation, action):
+        """
+        Move an agent with an primitive action.
+
+        :return: New state, achieved goal, coordinate of the achieved goal, inventory, inventory one-hot vector
+        """
         x, y = int(observation['state'][0]), int(observation['state'][1])
         x_, y_ = x, y
         if action == 0:
@@ -159,6 +176,11 @@ class Env(object):
         return state_, ag, ag_loc, inv, inv_vector
 
     def _check_move(self, x, y, x_, y_, inventory, inventory_vector):
+        """
+        Check if a movement is valid, return an achieved goal and a possibly changed inventory
+
+        :return: New state, achieved goal, coordinate of the achieved goal, inventory, inventory one-hot vector
+        """
         achieved_goal = self.world_running["row" + str(y_)][x_]
         if achieved_goal == 1:
             state_ = np.array(([x_, y_]), dtype=np.float)
@@ -196,13 +218,27 @@ class Env(object):
         return state_, achieved_goal, achieved_goal_loc, inventory, inventory_vector
 
     def get_goal_location(self, goal):
+        """
+        :return: The coordinate of a goal.
+        """
         return np.array(([self.key_door_dict[goal][2], self.key_door_dict[goal][1]]), dtype=np.float)
 
     @staticmethod
     def _create_world(init_room_height, middle_room_size, middle_room_num, final_room_num):
+        """
+        This function automatically create a world given some information of the world.
+            The height of the hall room is manual given.
+            The height of the world is determined by the height of the hall room and the size of middle/final rooms.
+            The width of the world is determined by the size and number of middle/final rooms.
+
+        :param init_room_height:  The height of the hall room (beginning of every episode)
+        :param middle_room_size:  The size of the middle and final rooms (they are the same, and they are square)
+        :param middle_room_num:   The number of the middle rooms
+        :param final_room_num:    The number of the final rooms
+        :return: Dictionaries of the world and all of the goals.
+        """
         if middle_room_num < final_room_num:
             raise ValueError("The number of middle rooms should be greater than that of final rooms")
-
         # create the main room
         init_room_width = middle_room_size*middle_room_num + middle_room_num-1
         init_rooms = np.ones((init_room_height, init_room_width), dtype=np.int)
