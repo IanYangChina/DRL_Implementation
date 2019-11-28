@@ -24,7 +24,7 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from Agent.networks import Actor, Critic
+from agent.networks import Actor, Critic
 T.manual_seed(0)
 random.seed(0)
 np.random.seed(0)
