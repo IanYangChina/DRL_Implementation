@@ -2,7 +2,7 @@ import gym
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import namedtuple
-from Agent.herddpg_continuous import DDPGAgent
+from agent.herddpg_continuous import DDPGAgent
 
 T = namedtuple("transition",
                ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
