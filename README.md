@@ -8,7 +8,7 @@
 - [ ] DDPG
 - [ ] PDQN_Discrete (Prioritized)
 - [ ] HER_DQN_Discrete (Hindsight)
-- [ ] HER_DDPG_Continuous (Hindsight)
+- [X] HER_DDPG_Continuous (Hindsight)
 - [ ] HER_DoubleDQN_Discrete (Hindsight)
 - [ ] Option_PHER_DQN_Discrete (Prioritized & Hindsight)
 - [ ] Option_PHER_DDPG_Continuous (Prioritized & Hindsight)
