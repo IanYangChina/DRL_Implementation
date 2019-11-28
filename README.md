@@ -13,7 +13,7 @@
 - [ ] Option_PHER_DQN_Discrete (Prioritized & Hindsight)
 - [ ] Option_PHER_DDPG_Continuous (Prioritized & Hindsight)
 
-### Discrete Environments
+### Environments
 * Maze (Discrete)
 * Multi-goal Maze (Discrete)
 * Multi-task, Multi-goal Maze (Discrete)
