@@ -18,7 +18,7 @@
 
 # for exploration, they randomly select action from uniform distribution with 20% chance
 # and with 80% chance, they add normal noise into each coordinate with standard deviation equal to 5% of the max bound
-
+import os
 import random
 import numpy as np
 import torch as T
@@ -135,7 +135,14 @@ class ReplayBuffer(object):
 class DDPGAgent(object):
     def __init__(self, env_params, transition_namedtuple, noise_deviation_rate=0.05, random_action_chance=0.2,
                  tau=0.05, batch_size=128, memory_capacity=1000000, optimization_steps=40, clip_rate=0.98,
-                 discount_factor=0.98, learning_rate=0.001):
+                 discount_factor=0.98, learning_rate=0.001, path=None):
+        if path is None:
+            self.ckpt_path = "ckpts"
+        else:
+            self.ckpt_path = path+"/ckpts"
+        if not os.path.isdir(self.ckpt_path):
+            os.mkdir(self.ckpt_path)
+
         self.state_dim = env_params['obs_dims']
         self.goal_dim = env_params['goal_dims']
         self.action_dim = env_params['action_dims']
@@ -261,12 +268,12 @@ class DDPGAgent(object):
                 target_param.data * (1.0 - tau) + param.data * tau
             )
 
-    def save_networks(self, folder, epoch):
-        T.save(self.actor.state_dict(), './'+folder+'/ckpt_actor_epoch'+str(epoch)+'.pt')
-        T.save(self.critic.state_dict(), './'+folder+'/ckpt_critic_epoch'+str(epoch)+'.pt')
-        T.save(self.actor_target.state_dict(), './'+folder+'/ckpt_actor_target_epoch'+str(epoch)+'.pt')
-        T.save(self.critic_target.state_dict(), './'+folder+'/ckpt_critic_target_epoch'+str(epoch)+'.pt')
+    def save_networks(self, epoch):
+        T.save(self.actor.state_dict(), self.ckpt_path+'/ckpt_actor_epoch'+str(epoch)+'.pt')
+        T.save(self.critic.state_dict(), self.ckpt_path+'/ckpt_critic_epoch'+str(epoch)+'.pt')
+        T.save(self.actor_target.state_dict(), self.ckpt_path+'/ckpt_actor_target_epoch'+str(epoch)+'.pt')
+        T.save(self.critic_target.state_dict(), self.ckpt_path+'/ckpt_critic_target_epoch'+str(epoch)+'.pt')
 
-    def load_network(self, folder, epoch):
-        self.actor_target.load_state_dict(T.load('./'+folder+'/ckpt_actor_target_epoch'+str(epoch)+'.pt'))
-        self.critic_target.load_state_dict(T.load('./'+folder+'/ckpt_critic_target_epoch'+str(epoch)+'.pt'))
+    def load_network(self, epoch):
+        self.actor_target.load_state_dict(T.load(self.ckpt_path+'/ckpt_actor_target_epoch'+str(epoch)+'.pt'))
+        self.critic_target.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_target_epoch'+str(epoch)+'.pt'))

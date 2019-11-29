@@ -4,26 +4,26 @@
 - Main library: PyTorch
 
 ### Algorithms to Implement
-- [ ] DQN
-- [ ] DDPG
-- [ ] PDQN_Discrete (Prioritized)
-- [ ] HER_DQN_Discrete (Hindsight)
-- [X] HER_DDPG_Continuous (Hindsight)
-- [ ] HER_DoubleDQN_Discrete (Hindsight)
-- [ ] Option_PHER_DQN_Discrete (Prioritized & Hindsight)
-- [ ] Option_PHER_DDPG_Continuous (Prioritized & Hindsight)
+- [ ] Prioritized DQN - Discrete
+- [ ] Hindsight DQN - Discrete
+- [X] Hindsight DDPG - Continuous
+- [ ] Hindsight DoubleDQN - Discrete
+- [ ] HIRO - Continuous
+- [X] Option Hindsight DQN - Discrete
+- [ ] Option Hindsight DDPG - Continuous
 
 ### Environments
-* Maze (Discrete)
-* Multi-goal Maze (Discrete)
-* Multi-task, Multi-goal Maze (Discrete)
-* OpenAI Gym Mujoco Goal Environment (Continuous)
+* GridWorld (Discrete, Customized)
+* GridWorld_KeyDoor (Discrete, Multi-goal, Customized)
+* OpenAI Gym Mujoco Robotic Goal Environment (Continuous, Official)
+* OpenAI Gym Mujoco Robotic Multi-goal Environment (Continuous, Customized)
 
 ### Reference
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)
+* [DoubleDQN](https://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/viewPaper/12389)
 * [DDPG](https://arxiv.org/abs/1509.02971)
 * [PER](https://arxiv.org/abs/1511.05952)
 * [HER](http://papers.nips.cc/paper/7090-hindsight-experience-replay)
-* [DoubleDQN](https://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/viewPaper/12389)
+* [HIRO](http://papers.nips.cc/paper/7591-data-efficient-hierarchical-reinforcement-learning.pdf)
 * [OptionFramework](https://www.sciencedirect.com/science/article/pii/S0004370299000521)
 * [OptionCritic](https://www.aaai.org/ocs/index.php/AAAI/AAAI17/paper/viewPaper/14858)

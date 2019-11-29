@@ -1,8 +1,10 @@
+import os
 import gym
 import numpy as np
-import matplotlib.pyplot as plt
+from plot import smoothed_plot
 from collections import namedtuple
 from agent.herddpg_continuous import DDPGAgent
+path = os.path.dirname(os.path.realpath(__file__))
 
 T = namedtuple("transition",
                ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
@@ -18,12 +20,12 @@ env_params = {'obs_dims': obs['observation'].shape[0],
               'init_input_var': np.array(([0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98,
                                            0.98, 0.98, 0.98]))
               }
-agent = DDPGAgent(env_params, T)
+agent = DDPGAgent(env_params, T, path=path)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
 # Load target networks at epoch 50, from folder /Fetch
-agent.load_network('Fetch', 50)
+agent.load_network(50)
 success_rates = []
 cycle_returns = []
 EPOCH = 200 + 1
@@ -64,12 +66,7 @@ for epo in range(EPOCH):
         # agent.learn()
 
     if (epo % 50 == 0) and (epo != 0):
-        agent.save_networks('Fetch', epo)
+        agent.save_networks(epo)
 
-plt.plot(success_rates)
-plt.savefig("success_rates.png")
-plt.close()
-
-plt.plot(cycle_returns)
-plt.savefig("cycle_returns.png")
-plt.close()
+smoothed_plot("success_rates.png", success_rates, x_label="Cycle")
+smoothed_plot("cycle_returns.png", cycle_returns, x_label="Cycle")
