@@ -15,12 +15,12 @@ page](https://github.com/openai/mujoco-py/issues/253). However, I still suggest 
 added in the future.  
 * Actor, critic networks have 3 hidden layers, each with 256 units and relu activation; critic output without activation, 
 while actor output with tanh and rescaling.  
-* Observation and goal are concatenated and fed into both networks
+* Observation and goal are concatenated and fed into both networks.  
 * In the original paper, actions are increments along x, y, z axes, joint velocity is fixed.  
 * The original paper scales observation, goals and actions into [-5, 5] (we don't need to that with the Gym environment), 
-and normalize to 0 mean and standard variation. The means and standard deviations are computed using encountered data  
+and normalize to 0 mean and standard variation. The means and standard deviations are computed using encountered data.  
 * Training process has 200 epochs with 50 cycles, each of which has 16 episodes and 40 optimization steps. The total 
-episode number is 200*50*16=160000, each of which has 50 time steps. After every 16 episodes, 40 optimization steps are 
+episode number is 200\*50\*16=160000, each of which has 50 time steps. After every 16 episodes, 40 optimization steps are 
 performed.  
 * Each optimization step uses a mini-batch of 128 batch size uniformly sampled from a replay buffer with 10^6 capacity,
 target network is updated softly with tau=0.05.  
