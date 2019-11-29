@@ -1,23 +1,3 @@
-# the original paper uses multiple cpu to collect data
-
-# actor, critic networks have 3 hidden layers, each with 256 units and relu activation
-# critic output without activation, while actor output with tanh and rescaling
-# observation and goal are concatenated and fed into both networks
-# in the original paper, actions are only x, y, z coordinates, joint velocity is set fixed
-
-# the original paper scales observation, goals and actions into [-5, 5], and normalize to 0 mean and standard variation
-# for normalization, the mean and standard deviation are computed using encountered data
-
-# training process has 200 epochs with 50 cycles, each of which has 16 episodes and 40 optimization steps
-# the total episode number is 200*50*16=160000, each of which has 50 time steps
-# after every 16 episodes, 40 optimization steps are performed
-# each optimization step uses a mini-batch of 128 batch size uniformly sampled from a replay buffer with 10^6 capacity
-# target network is updated softly with tau=0.05
-# Adam is used for learning with a learning rate of 0.001
-# discount factor is 0.98, target value is clipped to [-1/(1-0.98), 0], that is [-50, 0]
-
-# for exploration, they randomly select action from uniform distribution with 20% chance
-# and with 80% chance, they add normal noise into each coordinate with standard deviation equal to 5% of the max bound
 import os
 import random
 import numpy as np
