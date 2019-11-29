@@ -24,7 +24,7 @@ agent = DDPGAgent(env_params, T, path=path)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
-# Load target networks at epoch 50, from folder /Fetch
+# Load target networks at epoch 50
 agent.load_network(50)
 success_rates = []
 cycle_returns = []

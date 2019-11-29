@@ -144,6 +144,8 @@ class OptionDQN(object):
             self.ckpt_path = path+"/ckpts"
         if not os.path.isdir(self.ckpt_path):
             os.mkdir(self.ckpt_path)
+        use_cuda = T.cuda.is_available()
+        self.device = T.device("cuda" if use_cuda else "cpu")
 
         self.opt_input_dim = env_params['opt_input_dim']
         self.opt_output_dim = env_params['opt_output_dim']
@@ -155,14 +157,14 @@ class OptionDQN(object):
         self.input_min = env_params['input_min']
         self.env_type = env_params['env_type']
 
-        self.option_agent = Critic(self.opt_input_dim, self.opt_output_dim).cuda()
-        self.option_target = Critic(self.opt_input_dim, self.opt_output_dim).cuda()
+        self.option_agent = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
+        self.option_target = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_optimizer = Adam(self.option_agent.parameters(), lr=option_lr)
         self.option_memory = OptionReplayBuffer(opt_mem_capacity, opt_tr_namedtuple)
         self.opt_batch_size = opt_batch_size
 
-        self.action_agent = Critic(self.act_input_dim, self.act_output_dim).cuda()
-        self.action_target = Critic(self.act_input_dim, self.act_output_dim).cuda()
+        self.action_agent = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
+        self.action_target = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
         self.action_optimizer = Adam(self.action_agent.parameters(), lr=action_lr)
         self.action_memory = ActionReplayBuffer(act_mem_capacity, act_tr_namedtuple)
         self.act_batch_size = act_batch_size
@@ -212,7 +214,7 @@ class OptionDQN(object):
     def select_option(self, opt_obs, ep=None):
         inputs = np.concatenate((opt_obs['state'], opt_obs['final_goal_loc'], opt_obs['inventory_vector']), axis=0)
         inputs = self.scale(inputs)
-        inputs = T.tensor(inputs, dtype=T.float).cuda()
+        inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         self.option_target.eval()
         option_values = self.option_target(inputs)
         if ep is None:
@@ -232,7 +234,7 @@ class OptionDQN(object):
     def select_action(self, act_obs, ep=None):
         inputs = np.concatenate((act_obs['state'], act_obs['desired_goal_loc'], act_obs['inventory_vector']), axis=0)
         inputs = self.scale(inputs)
-        inputs = T.tensor(inputs, dtype=T.float).cuda()
+        inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         self.action_target.eval()
         action_values = self.action_target(inputs)
         if ep is None:
@@ -298,14 +300,14 @@ class OptionDQN(object):
         batch = self.option_memory.sample(batch_size)
         inputs = np.concatenate((batch.state, batch.final_goal, batch.inventory), axis=1)
         inputs = self.scale(inputs)
-        inputs = T.tensor(inputs, dtype=T.float).cuda()
+        inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         inputs_ = np.concatenate((batch.next_state, batch.next_goal, batch.next_inventory), axis=1)
         inputs_ = self.scale(inputs_)
-        inputs_ = T.tensor(inputs_, dtype=T.float).cuda()
-        options = T.tensor(batch.option, dtype=T.long).unsqueeze(1).cuda()
-        rewards = T.tensor(batch.reward, dtype=T.float).unsqueeze(1).cuda()
-        option_done = T.tensor(batch.option_done, dtype=T.float).unsqueeze(1).cuda()
-        episode_done = T.tensor(batch.done, dtype=T.float).unsqueeze(1).cuda()
+        inputs_ = T.tensor(inputs_, dtype=T.float).to(self.device)
+        options = T.tensor(batch.option, dtype=T.long).unsqueeze(1).to(self.device)
+        rewards = T.tensor(batch.reward, dtype=T.float).unsqueeze(1).to(self.device)
+        option_done = T.tensor(batch.option_done, dtype=T.float).unsqueeze(1).to(self.device)
+        episode_done = T.tensor(batch.done, dtype=T.float).unsqueeze(1).to(self.device)
 
         self.option_agent.train()
         self.option_target.eval()
@@ -331,13 +333,13 @@ class OptionDQN(object):
         batch = self.action_memory.sample(batch_size)
         inputs = np.concatenate((batch.state, batch.desired_goal, batch.inventory), axis=1)
         inputs = self.scale(inputs)
-        inputs = T.tensor(inputs, dtype=T.float).cuda()
+        inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         inputs_ = np.concatenate((batch.next_state, batch.next_goal, batch.next_inventory), axis=1)
         inputs_ = self.scale(inputs_)
-        inputs_ = T.tensor(inputs_, dtype=T.float).cuda()
-        actions = T.tensor(batch.action, dtype=T.long).unsqueeze(1).cuda()
-        rewards = T.tensor(batch.reward, dtype=T.float).unsqueeze(1).cuda()
-        episode_done = T.tensor(batch.done, dtype=T.float).unsqueeze(1).cuda()
+        inputs_ = T.tensor(inputs_, dtype=T.float).to(self.device)
+        actions = T.tensor(batch.action, dtype=T.long).unsqueeze(1).to(self.device)
+        rewards = T.tensor(batch.reward, dtype=T.float).unsqueeze(1).to(self.device)
+        episode_done = T.tensor(batch.done, dtype=T.float).unsqueeze(1).to(self.device)
 
         self.action_agent.train()
         self.action_target.eval()

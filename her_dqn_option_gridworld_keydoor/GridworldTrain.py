@@ -44,7 +44,6 @@ env_params = {'input_max': env.input_max,
               'env_type': "Hard"
               }
 agent = OptionDQN(env_params, OptTr, ActTr, path=path, opt_eps_decay_start=EPOCH*CYCLE*EPISODE*0.5)
-agent.save_network(0)
 test = False
 test_success_rates = []
 opt_success_rates = []
