@@ -171,7 +171,10 @@ class GridWorldEnv(object):
         # agent attempts to open a door
         elif achieved_goal in self.doors:
             requested_key = dcp(achieved_goal)
-            requested_key = 'k'+requested_key[1]
+            try:
+                requested_key = requested_key[-3] + 'k' + requested_key[-1]
+            except:
+                requested_key = 'k' + requested_key[-1]
             if requested_key not in inventory:
                 # agent does not carry the corresponding key
                 x_ = x

@@ -133,8 +133,8 @@ class OptionReplayBuffer(object):
 
 
 class OptionDQN(object):
-    def __init__(self, env_params, opt_tr_namedtuple, act_tr_namedtuple, path=None,
-                 option_lr=1e-3, opt_mem_capacity=int(1e6), opt_batch_size=128, opt_tau=0.1,
+    def __init__(self, env_params, opt_tr_namedtuple, act_tr_namedtuple, path=None, is_act_inv=True,
+                 option_lr=1e-3, opt_mem_capacity=int(1e6), opt_batch_size=128, opt_tau=0.01,
                  action_lr=1e-5, act_mem_capacity=int(1e6), act_batch_size=512, act_tau=0.01, clip_value=5.0,
                  optimization_steps=2, gamma=0.99, eps_start=1, eps_end=0.05, eps_decay=50000,
                  opt_eps_decay_start=None):
@@ -154,8 +154,10 @@ class OptionDQN(object):
         self.act_output_dim = env_params['act_output_dim']
         self.act_max = env_params['act_max']
         self.input_max = env_params['input_max']
+        self.input_max_no_inv = np.delete(self.input_max, [n for n in range(4, len(self.input_max))], axis=0)
         self.input_min = env_params['input_min']
-        self.env_type = env_params['env_type']
+        self.input_min_no_inv = np.delete(self.input_min, [n for n in range(4, len(self.input_min))], axis=0)
+        self.is_act_inv = is_act_inv
 
         self.option_agent = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_target = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
@@ -232,8 +234,12 @@ class OptionDQN(object):
             return option
 
     def select_action(self, act_obs, ep=None):
-        inputs = np.concatenate((act_obs['state'], act_obs['desired_goal_loc'], act_obs['inventory_vector']), axis=0)
-        inputs = self.scale(inputs)
+        if self.is_act_inv:
+            inputs = np.concatenate((act_obs['state'], act_obs['desired_goal_loc'], act_obs['inventory_vector']), axis=0)
+            inputs = self.scale(inputs)
+        else:
+            inputs = np.concatenate((act_obs['state'], act_obs['desired_goal_loc']), axis=0)
+            inputs = self.scale(inputs, inv=False)
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         self.action_target.eval()
         action_values = self.action_target(inputs)
@@ -331,12 +337,19 @@ class OptionDQN(object):
         if len(self.action_memory) < batch_size:
             return
         batch = self.action_memory.sample(batch_size)
-        inputs = np.concatenate((batch.state, batch.desired_goal, batch.inventory), axis=1)
-        inputs = self.scale(inputs)
+        if self.is_act_inv:
+            inputs = np.concatenate((batch.state, batch.desired_goal, batch.inventory), axis=1)
+            inputs_ = np.concatenate((batch.next_state, batch.next_goal, batch.next_inventory), axis=1)
+            inputs = self.scale(inputs)
+            inputs_ = self.scale(inputs_)
+        else:
+            inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
+            inputs_ = np.concatenate((batch.next_state, batch.next_goal), axis=1)
+            inputs = self.scale(inputs, inv=False)
+            inputs_ = self.scale(inputs_, inv=False)
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
-        inputs_ = np.concatenate((batch.next_state, batch.next_goal, batch.next_inventory), axis=1)
-        inputs_ = self.scale(inputs_)
         inputs_ = T.tensor(inputs_, dtype=T.float).to(self.device)
+
         actions = T.tensor(batch.action, dtype=T.long).unsqueeze(1).to(self.device)
         rewards = T.tensor(batch.reward, dtype=T.float).unsqueeze(1).to(self.device)
         episode_done = T.tensor(batch.done, dtype=T.float).unsqueeze(1).to(self.device)
@@ -383,6 +396,9 @@ class OptionDQN(object):
         self.option_target.load_state_dict(T.load(self.ckpt_path+'/ckpt_option_target_epo'+str(epo)+'.pt'))
         self.action_target.load_state_dict(T.load(self.ckpt_path+'/ckpt_action_target_epo'+str(epo)+'.pt'))
 
-    def scale(self, inputs):
-        ins = (inputs - self.input_min) / (self.input_max - self.input_min)
+    def scale(self, inputs, inv=True):
+        if inv:
+            ins = (inputs - self.input_min) / (self.input_max - self.input_min)
+        else:
+            ins = (inputs - self.input_min_no_inv) / (self.input_max_no_inv - self.input_min_no_inv)
         return ins

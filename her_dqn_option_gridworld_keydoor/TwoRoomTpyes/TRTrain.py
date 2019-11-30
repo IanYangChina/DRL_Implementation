@@ -3,7 +3,7 @@ import numpy as np
 from plot import smoothed_plot
 from copy import deepcopy as dcp
 from collections import namedtuple
-from envs.GridWorld_KeyDoorEnv import KeyDoorEnv
+from envs.GridWorld_TwoRoomTypes import TwoRoomType
 from agent.herdqn_option_discrete import OptionDQN
 path = os.path.dirname(os.path.realpath(__file__))
 
@@ -13,11 +13,11 @@ OptTr = namedtuple('OptionTransition',
 ActTr = namedtuple('ActionTransition',
                    ('state', 'inventory', 'desired_goal', 'action', 'next_state', 'next_inventory', 'next_goal',
                     'achieved_goal', 'reward', 'done'))
-env_setup = {'locked_room_height': 15,
-             'locked_room_width': 3,
-             'locked_room_num': 3,
-             'hall_height': 20}
-env = KeyDoorEnv(env_setup, seed=2222)
+env_setup = {'middle_room_size': 5,
+             'middle_room_num': 3,
+             'final_room_num': 3,
+             'main_room_height': 20}
+env = TwoRoomType(env_setup, seed=2222)
 # Print world layout and sub-goals (options)
 for key in env.world:
     print(key, env.world[key])
@@ -41,7 +41,6 @@ env_params = {'input_max': env.input_max,
               'act_input_dim': act_obs['state'].shape[0]+act_obs['desired_goal_loc'].shape[0]+act_obs['inventory_vector'].shape[0],
               'act_output_dim': len(env.action_space),
               'act_max': np.max(env.action_space),
-              'env_type': "Hard"
               }
 agent = OptionDQN(env_params, OptTr, ActTr, path=path, opt_eps_decay_start=EPOCH*CYCLE*EPISODE*0.5)
 test = False

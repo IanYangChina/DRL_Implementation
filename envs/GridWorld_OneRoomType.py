@@ -3,7 +3,7 @@ import random as r
 from envs.GridWorld import GridWorldEnv
 
 
-class KeyDoorEnv(GridWorldEnv):
+class OneRoomType(GridWorldEnv):
     """
     This world has one type of rooms.
     Keys are placed in the hall.

@@ -3,7 +3,7 @@ import random as r
 from envs.GridWorld import GridWorldEnv
 
 
-class HardKeyDoorEnv(GridWorldEnv):
+class TwoRoomType(GridWorldEnv):
     """
     This world has two types of rooms: middle and final.
     Keys for the final room are placed in the middle room that links with it.
