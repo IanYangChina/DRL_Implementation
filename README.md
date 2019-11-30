@@ -1,7 +1,8 @@
 # DRL_Implementation
 
 - This repository will be filled with codes reproducing some DRL algos I'm interested in.
-- Main library: PyTorch
+- Language: Python-3.6
+- Main library: PyTorch-1.3.0, Mujoco-py-2.0.2.8, Gym-0.15.3  
 
 ### Algorithms to Implement
 - [ ] Prioritized DQN - Discrete
