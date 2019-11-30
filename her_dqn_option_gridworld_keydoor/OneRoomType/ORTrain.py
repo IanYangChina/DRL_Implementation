@@ -32,7 +32,7 @@ OPT_EPISODE_T = 50*len(env.final_goals)
 ACT_EPISODE_T = 50*len(env.goal_space)
 TIMESTEP = 70
 TIMESTEP_T = 70
-# Instantialize an agent
+# Instantiate an agent
 env_params = {'input_max': env.input_max,
               'input_min': env.input_min,
               'opt_input_dim': opt_obs['state'].shape[0]+opt_obs['final_goal_loc'].shape[0]+opt_obs['inventory_vector'].shape[0],
