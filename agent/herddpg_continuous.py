@@ -1,13 +1,11 @@
 import os
-import random
+import random as R
 import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.networks import Actor, Critic
-T.manual_seed(0)
-random.seed(0)
-np.random.seed(0)
+from agent.replay_buffer import ReplayBuffer
 
 
 class Normalizer(object):
@@ -53,33 +51,18 @@ class Normalizer(object):
         return self.scale_factor*inputs
 
 
-class ReplayBuffer(object):
-    def __init__(self, capacity, tr_namedtuple):
-        self.capacity = capacity
-        self.memory = []
-        self.position = 0
-        self.episodes = []
-        self.ep_position = -1
-        self.Transition = tr_namedtuple
+class HindsightReplayBuffer(ReplayBuffer):
+    def __init__(self, capacity, tr_namedtuple, seed=0):
+        ReplayBuffer.__init__(capacity, tr_namedtuple, seed)
 
-    def store_episode(self):
-        if len(self.episodes) == 0:
-            return
-        for ep in self.episodes:
-            for n in range(len(ep)):
-                if len(self.memory) < self.capacity:
-                    self.memory.append(None)
-                self.memory[self.position] = ep[n]
-                self.position = (self.position + 1) % self.capacity
-        self.episodes.clear()
-        self.ep_position = -1
-
-    def modify_experiences(self, k=4):
+    def modify_episodes(self, k=4):
         if len(self.episodes) == 0:
             return
         for k_ in range(k):
             for _ in range(len(self.episodes)):
                 ep = self.episodes[_]
+                if len(ep) < 2+k_:
+                    continue
                 modified_ep = []
                 ind = len(ep)-1-k_
                 imagined_goal = ep[ind].achieved_goal
@@ -97,25 +80,14 @@ class ReplayBuffer(object):
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                 self.episodes.append(modified_ep)
 
-    def store_experience(self, new_episode, *args):
-        # new_episode must be a boolean variable
-        if new_episode:
-            self.episodes.append([])
-            self.ep_position += 1
-        self.episodes[self.ep_position].append(self.Transition(*args))
-
-    def sample(self, batch_size):
-        batch = random.sample(self.memory, batch_size)
-        return self.Transition(*zip(*batch))
-
-    def __len__(self):
-        return len(self.memory)
-
 
 class DDPGAgent(object):
     def __init__(self, env_params, transition_namedtuple, noise_deviation_rate=0.05, random_action_chance=0.2,
+                 torch_seed=0, random_seed=0,
                  tau=0.05, batch_size=128, memory_capacity=1000000, optimization_steps=40, clip_rate=0.98,
                  discount_factor=0.98, learning_rate=0.001, path=None):
+        T.manual_seed(torch_seed)
+        R.seed(random_seed)
         if path is None:
             self.ckpt_path = "ckpts"
         else:
@@ -145,7 +117,7 @@ class DDPGAgent(object):
         self.clip_rate = clip_rate
         self.clip_value = -1 / (1-self.clip_rate)
 
-        self.buffer = ReplayBuffer(memory_capacity, transition_namedtuple)
+        self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, seed=random_seed)
         self.batch_size = batch_size
 
         self.optimizer_steps = optimization_steps
@@ -157,7 +129,7 @@ class DDPGAgent(object):
         if not test:
             inputs = np.concatenate((state, desired_goal), axis=0)
             self.normalizer.store_history(inputs)
-            chance = random.uniform(0, 1)
+            chance = R.uniform(0, 1)
             if chance < self.random_action_chance:
                 action = np.random.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
                 return action
@@ -185,8 +157,8 @@ class DDPGAgent(object):
         self.buffer.store_experience(new_episode, *args)
 
     def apply_hindsight(self):
-        self.buffer.modify_experiences()
-        self.buffer.store_episode()
+        self.buffer.modify_episodes()
+        self.buffer.store_episodes()
 
     def learn(self, steps=None, batch_size=None):
         if batch_size is None:

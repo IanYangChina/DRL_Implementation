@@ -5,19 +5,17 @@
 - Main library: PyTorch-1.3.0, Mujoco-py-2.0.2.8, Gym-0.15.3  
 
 ### Algorithms to Implement
-- [ ] Prioritized DQN - Discrete
-- [ ] Hindsight DQN - Discrete
+- [X] Hindsight DQN - Discrete
 - [X] Hindsight DDPG - Continuous
-- [ ] Hindsight DoubleDQN - Discrete
+- [ ] Hindsight TD3 - Discrete
 - [ ] HIRO - Continuous
 - [X] Option Hindsight DQN - Discrete
 - [ ] Option Hindsight DDPG - Continuous
 
 ### Environments
-* GridWorld (Discrete, Customized)
-* GridWorld_KeyDoor (Discrete, Multi-goal, Customized)
-* OpenAI Gym Mujoco Robotic Goal Environment (Continuous, Official)
-* OpenAI Gym Mujoco Robotic Multi-goal Environment (Continuous, Customized)
+- [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal, Customized)
+- [X] OpenAI Gym Mujoco Robotic Goal Environment (Continuous, Official)
+- [ ] OpenAI Gym Mujoco Robotic Multi-goal Environment (Continuous, Customized)
 
 ### Reference Papers
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)

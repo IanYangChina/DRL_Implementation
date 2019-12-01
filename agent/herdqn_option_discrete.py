@@ -6,32 +6,20 @@ import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.networks import Critic
-T.manual_seed(0)
-R.seed(1)
+from agent.replay_buffer import ReplayBuffer
 
 
-class ActionReplayBuffer(object):
-    def __init__(self, capacity, tr_namedtuple):
-        self.capacity = capacity
-        self.memory = []
-        self.position = 0
-        self.episodes = []
-        self.ep_position = -1
-        self.Transition = tr_namedtuple
+class ActionReplayBuffer(ReplayBuffer):
+    def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
+        self.k = sampled_goal_num
+        ReplayBuffer.__init__(capacity, tr_namedtuple, seed)
 
-    def store_experience(self, new_option=False, *args):
-        # $new_episode is a boolean value
-        if new_option:
-            self.episodes.append([])
-            self.ep_position += 1
-        self.episodes[self.ep_position].append(self.Transition(*args))
-
-    def modify_episodes(self, k=6):
+    def modify_episodes(self):
         if len(self.episodes) == 0:
             return
         for _ in range(len(self.episodes)):
             ep = self.episodes[_]
-            imagined_goals = self.sample_achieved_goal(ep, k)
+            imagined_goals = self.sample_achieved_goal(ep)
             for n in range(len(imagined_goals[0])):
                 ind = imagined_goals[0][n]
                 goal = imagined_goals[1][n]
@@ -53,27 +41,9 @@ class ActionReplayBuffer(object):
                         modified_ep.append(self.Transition(s, inv, dg, a, ns, ninv, ng, ag, r, d))
                 self.episodes.append(modified_ep)
 
-    def store_episodes(self):
-        if len(self.episodes) == 0:
-            return
-        for ep in self.episodes:
-            for n in range(len(ep)):
-                if len(self.memory) < self.capacity:
-                    self.memory.append(None)
-                self.memory[self.position] = ep[n]
-                self.position = (self.position + 1) % self.capacity
-        self.episodes.clear()
-        self.ep_position = -1
-
-    def sample(self, batch_size):
-        batch = R.sample(self.memory, batch_size)
-        return self.Transition(*zip(*batch))
-
-    @staticmethod
-    def sample_achieved_goal(ep, k):
+    def sample_achieved_goal(self, ep):
         goals = [[], []]
-
-        for k_ in range(k):
+        for k_ in range(self.k):
             done = False
             count = 0
             while not done:
@@ -92,52 +62,22 @@ class ActionReplayBuffer(object):
                     break
         return goals
 
-    def __len__(self):
-        return len(self.memory)
 
-
-class OptionReplayBuffer(object):
-    def __init__(self, capacity, tr_namedtuple):
+class OptionReplayBuffer(ReplayBuffer):
+    def __init__(self, capacity, tr_namedtuple, seed=0):
+        ReplayBuffer.__init__(capacity, tr_namedtuple, seed)
         self.capacity = capacity
-        self.memory = []
-        self.position = 0
-        self.episodes = []
-        self.ep_position = -1
-        self.Transition = tr_namedtuple
-
-    def store_experience(self, new_option=False, *args):
-        # $new_episode is a boolean value
-        if new_option:
-            self.episodes.append([])
-            self.ep_position += 1
-        self.episodes[self.ep_position].append(self.Transition(*args))
-
-    def store_episodes(self):
-        if len(self.episodes) == 0:
-            return
-        for ep in self.episodes:
-            for n in range(len(ep)):
-                if len(self.memory) < self.capacity:
-                    self.memory.append(None)
-                self.memory[self.position] = ep[n]
-                self.position = (self.position + 1) % self.capacity
-        self.episodes.clear()
-        self.ep_position = -1
-
-    def sample(self, batch_size):
-        batch = R.sample(self.memory, batch_size)
-        return self.Transition(*zip(*batch))
-
-    def __len__(self):
-        return len(self.memory)
 
 
 class OptionDQN(object):
     def __init__(self, env_params, opt_tr_namedtuple, act_tr_namedtuple, path=None, is_act_inv=True,
+                 torch_seed=0, random_seed=0,
                  option_lr=1e-3, opt_mem_capacity=int(1e6), opt_batch_size=128, opt_tau=0.01,
                  action_lr=1e-5, act_mem_capacity=int(1e6), act_batch_size=512, act_tau=0.01, clip_value=5.0,
                  optimization_steps=2, gamma=0.99, eps_start=1, eps_end=0.05, eps_decay=50000,
                  opt_eps_decay_start=None):
+        T.manual_seed(torch_seed)
+        R.seed(random_seed)
         if path is None:
             self.ckpt_path = "ckpts"
         else:
@@ -162,13 +102,13 @@ class OptionDQN(object):
         self.option_agent = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_target = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_optimizer = Adam(self.option_agent.parameters(), lr=option_lr)
-        self.option_memory = OptionReplayBuffer(opt_mem_capacity, opt_tr_namedtuple)
+        self.option_memory = OptionReplayBuffer(opt_mem_capacity, opt_tr_namedtuple, seed=random_seed)
         self.opt_batch_size = opt_batch_size
 
         self.action_agent = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
         self.action_target = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
         self.action_optimizer = Adam(self.action_agent.parameters(), lr=action_lr)
-        self.action_memory = ActionReplayBuffer(act_mem_capacity, act_tr_namedtuple)
+        self.action_memory = ActionReplayBuffer(act_mem_capacity, act_tr_namedtuple, seed=random_seed)
         self.act_batch_size = act_batch_size
 
         self.gamma = gamma
