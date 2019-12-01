@@ -3,13 +3,14 @@ import random as r
 from envs.GridWorld import GridWorldEnv
 
 
-class TwoRoomType(GridWorldEnv):
+class TwoRoomTypeHard(GridWorldEnv):
     """
     This world has two types of rooms: middle and final.
     Keys for the final room are placed in the middle room that links with it.
     Number of middle rooms and final rooms could be different, but finals should not be more than middles.
     """
     def __init__(self, env_setup, seed=2222):
+        self.env_type = "TRTH"
         setup = env_setup.copy()
         setup['init_height'] = setup['main_room_height']
         setup['init_width'] = setup['middle_room_num']*(setup['middle_room_size']+1)-1
