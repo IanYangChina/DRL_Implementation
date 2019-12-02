@@ -3,7 +3,7 @@ import gym
 import numpy as np
 from plot import smoothed_plot
 from collections import namedtuple
-from agent.herddpg_continuous import DDPGAgent
+from agent.herddpg_continuous import HindsightDDPGAgent
 path = os.path.dirname(os.path.realpath(__file__))
 
 T = namedtuple("transition",
@@ -20,7 +20,7 @@ env_params = {'obs_dims': obs['observation'].shape[0],
               'init_input_var': np.array(([0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98,
                                            0.98, 0.98, 0.98]))
               }
-agent = DDPGAgent(env_params, T, path=path, torch_seed=300, random_seed=300)
+agent = HindsightDDPGAgent(env_params, T, path=path, torch_seed=300, random_seed=300)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """

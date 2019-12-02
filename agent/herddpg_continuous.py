@@ -81,7 +81,7 @@ class HindsightReplayBuffer(ReplayBuffer):
                 self.episodes.append(modified_ep)
 
 
-class DDPGAgent(object):
+class HindsightDDPGAgent(object):
     def __init__(self, env_params, transition_namedtuple, noise_deviation_rate=0.05, random_action_chance=0.2,
                  torch_seed=0, random_seed=0,
                  tau=0.05, batch_size=128, memory_capacity=1000000, optimization_steps=40, clip_rate=0.98,

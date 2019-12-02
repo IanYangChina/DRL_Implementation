@@ -1,16 +1,16 @@
 import numpy as np
 import random as r
-from envs.GridWorld import GridWorldEnv
+from envs.gridworld import GridWorldEnv
 
 
-class TwoRoomTypeEasy(GridWorldEnv):
+class TwoRoomHard(GridWorldEnv):
     """
     This world has two types of rooms: middle and final.
-    Keys are all randomly placed in the hall.
+    Keys for the final room are placed in the middle room that links with it.
     Number of middle rooms and final rooms could be different, but finals should not be more than middles.
     """
     def __init__(self, env_setup, seed=2222):
-        self.env_type = "TRTE"
+        self.env_type = "TRH"
         setup = env_setup.copy()
         setup['init_height'] = setup['main_room_height']
         setup['init_width'] = setup['middle_room_num']*(setup['middle_room_size']+1)-1
@@ -96,15 +96,11 @@ class TwoRoomTypeEasy(GridWorldEnv):
                                           fg_xy[1]+1*(block_room_num+_+1) + middle_room_size*(block_room_num+_)]
             world_str[key_door_dict['fg'+str(_)][0]][key_door_dict['fg'+str(_)][1]] = 'fg'+str(_)
 
-            # randomly place the key of each final room within the main room or a middle room
-            done = False
-            while not done:
-                fkl = (r.randint(0, init_room_height-1), r.randint(1, init_room_width-1))
-                if fkl not in kls:
-                    kls.append(fkl)
-                    key_door_dict['fk'+str(_)] = [fkl[0]+middle_room_size*2+3, fkl[1]+1]
-                    world_str[key_door_dict['fk'+str(_)][0]][key_door_dict['fk'+str(_)][1]] = 'fk'+str(_)
-                    done = True
+            # place the key of each final room within the directly connected middle room
+            fkl = (r.randint(0, middle_room_size-1), r.randint(1, middle_room_size-1))
+            key_door_dict['fk'+str(_)] = [fkl[0]+middle_room_size+2,
+                                          fkl[1]+1*(_+1)+middle_room_size*_]
+            world_str[key_door_dict['fk'+str(_)][0]][key_door_dict['fk'+str(_)][1]] = 'fk'+str(_)
 
         world_dict = dict.fromkeys(["row"+str(len(world_np)-i-1) for i in range(len(world_np))])
         for i in range(len(world_str)):

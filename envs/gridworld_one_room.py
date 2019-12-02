@@ -1,15 +1,15 @@
 import numpy as np
 import random as r
-from envs.GridWorld import GridWorldEnv
+from envs.gridworld import GridWorldEnv
 
 
-class OneRoomType(GridWorldEnv):
+class OneRoom(GridWorldEnv):
     """
     This world has one type of rooms.
     Keys are placed in the hall.
     """
     def __init__(self, env_setup, seed=2222):
-        self.env_type = "ORT"
+        self.env_type = "OR"
         setup = env_setup.copy()
         setup['init_height'] = setup['hall_height']
         setup['init_width'] = setup['locked_room_num']*(setup['locked_room_width']+1)-1
