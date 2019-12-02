@@ -6,7 +6,7 @@ from agent.herdqn_option_discrete import OptionDQN
 
 
 class Trainer(object):
-    def __init__(self, env, path, is_act_inv=True,
+    def __init__(self, env, path, is_act_inv=True, torch_seed=0, random_seed=0,
                  training_epoch=401, training_cycle=50, training_episode=16, training_timesteps=70,
                  testing_episode_per_goal=50, testing_timesteps=70, testing_gap=1, saving_gap=50):
         self.path = path
@@ -31,7 +31,8 @@ class Trainer(object):
         if not self.is_act_inv:
             env_params['act_input_dim'] = act_obs['state'].shape[0] + act_obs['desired_goal_loc'].shape[0]
         self.agent = OptionDQN(env_params, OptTr, ActTr, is_act_inv=is_act_inv, path=self.path,
-                               opt_eps_decay_start=training_epoch*training_cycle*training_episode*0.5)
+                               opt_eps_decay_start=training_epoch*training_cycle*training_episode*0.5,
+                               torch_seed=torch_seed, random_seed=random_seed)
 
         self.training_epoch = training_epoch
         self.training_cycle = training_cycle

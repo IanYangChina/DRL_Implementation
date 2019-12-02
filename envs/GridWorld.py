@@ -76,6 +76,8 @@ class GridWorldEnv(object):
         if not act_test:
             return opt_observation, act_observation
         else:
+            act_observation['desired_goal'] = r.choice(self.goal_space)
+            act_observation['desired_goal_loc'] = self.get_goal_location(act_observation['desired_goal'])
             return act_observation
 
     def step(self, opt_obs, act_obs, action):

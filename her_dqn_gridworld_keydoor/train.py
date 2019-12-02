@@ -1,5 +1,4 @@
 import numpy as np
-import random as R
 from plot import smoothed_plot
 from copy import deepcopy as dcp
 from collections import namedtuple
@@ -7,10 +6,9 @@ from agent.herdqn_discrete import HindsightDQN
 
 
 class Trainer(object):
-    def __init__(self, env, path, is_inv=True, random_seed=0,
+    def __init__(self, env, path, is_inv=True, torch_seed=0, random_seed=0,
                  training_epoch=401, training_cycle=50, training_episode=16, training_timesteps=70,
                  testing_episode_per_goal=50, testing_timesteps=70, testing_gap=1, saving_gap=50):
-        R.seed = random_seed
         self.path = path
         self.env = env
         opt_obs, obs = self.env.reset()
@@ -26,7 +24,8 @@ class Trainer(object):
                       'env_type': env.env_type}
         if not self.is_inv:
             env_params['act_input_dim'] = obs['state'].shape[0] + obs['desired_goal_loc'].shape[0]
-        self.agent = HindsightDQN(env_params, ActTr, is_act_inv=is_inv, path=self.path)
+        self.agent = HindsightDQN(env_params, ActTr, is_act_inv=is_inv, path=self.path,
+                                  torch_seed=torch_seed, random_seed=random_seed)
 
         self.training_epoch = training_epoch
         self.training_cycle = training_cycle
@@ -67,8 +66,6 @@ class Trainer(object):
             ep_time_step = 0
             ep_done = False
             obs = self.env.reset(act_test=True)
-            obs['desired_goal'] = R.choice(self.env.goal_space)
-            obs['desired_goal_loc'] = self.env.get_goal_location(obs['desired_goal'])
             while (not ep_done) and (ep_time_step < self.training_timesteps):
                 ep_time_step += 1
                 action = self.agent.select_action(obs, ep=((ep + 1) * (cyc + 1) * (epo + 1)))
@@ -76,7 +73,7 @@ class Trainer(object):
                 obs['achieved_goal_loc'] = dcp(obs_['achieved_goal_loc'])
                 ep_returns += reward
                 # store transitions and renew observation
-                self.agent.remember(new_episode, "action",
+                self.agent.remember(new_episode,
                                     obs['state'], obs['inventory_vector'], obs['desired_goal_loc'],
                                     action,
                                     obs_['state'], obs_['inventory_vector'],

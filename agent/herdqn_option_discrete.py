@@ -12,7 +12,7 @@ from agent.replay_buffer import ReplayBuffer
 class ActionReplayBuffer(ReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
         self.k = sampled_goal_num
-        ReplayBuffer.__init__(capacity, tr_namedtuple, seed)
+        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
     def modify_episodes(self):
         if len(self.episodes) == 0:
@@ -65,8 +65,7 @@ class ActionReplayBuffer(ReplayBuffer):
 
 class OptionReplayBuffer(ReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, seed=0):
-        ReplayBuffer.__init__(capacity, tr_namedtuple, seed)
-        self.capacity = capacity
+        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
 
 class OptionDQN(object):

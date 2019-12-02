@@ -53,7 +53,7 @@ class Normalizer(object):
 
 class HindsightReplayBuffer(ReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, seed=0):
-        ReplayBuffer.__init__(capacity, tr_namedtuple, seed)
+        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
     def modify_episodes(self, k=4):
         if len(self.episodes) == 0:

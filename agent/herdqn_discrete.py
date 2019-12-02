@@ -12,7 +12,7 @@ from agent.replay_buffer import ReplayBuffer
 class HindsightReplayBuffer(ReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
         self.k = sampled_goal_num
-        ReplayBuffer.__init__(capacity, tr_namedtuple, seed)
+        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
     def modify_episodes(self):
         if len(self.episodes) == 0:
@@ -64,7 +64,7 @@ class HindsightReplayBuffer(ReplayBuffer):
 
 
 class HindsightDQN(object):
-    def __init__(self, env_params, act_tr_namedtuple, path=None, is_act_inv=True, torch_seed=1, random_seed=1,
+    def __init__(self, env_params, act_tr_namedtuple, path=None, is_act_inv=True, torch_seed=0, random_seed=0,
                  action_lr=1e-5, act_mem_capacity=int(1e6), act_batch_size=512, act_tau=0.01, clip_value=5.0,
                  optimization_steps=2, gamma=0.99, eps_start=1, eps_end=0.05, eps_decay=50000):
         T.manual_seed(torch_seed)

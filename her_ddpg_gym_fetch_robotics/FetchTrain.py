@@ -20,7 +20,7 @@ env_params = {'obs_dims': obs['observation'].shape[0],
               'init_input_var': np.array(([0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98,
                                            0.98, 0.98, 0.98]))
               }
-agent = DDPGAgent(env_params, T, path=path)
+agent = DDPGAgent(env_params, T, path=path, torch_seed=300, random_seed=300)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
