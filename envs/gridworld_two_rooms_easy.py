@@ -8,13 +8,15 @@ class TwoRoomEasy(GridWorldEnv):
     This world has two types of rooms: middle and final.
     Keys are all randomly placed in the hall.
     Number of middle rooms and final rooms could be different, but finals should not be more than middles.
+    :param random_key: if True, locations of keys will be randomly reset when reset() method is called.
     """
-    def __init__(self, env_setup, seed=2222):
-        self.env_type = "TRE"
+    def __init__(self, env_setup, random_key=True, seed=2222):
         setup = env_setup.copy()
         setup['init_height'] = setup['main_room_height']
         setup['init_width'] = setup['middle_room_num']*(setup['middle_room_size']+1)-1
         GridWorldEnv.__init__(self, setup, seed)
+        self.env_type = "TRE"
+        self.random_key = random_key
 
     def _create_world(self, setup):
         middle_room_size = setup['middle_room_size']
@@ -22,7 +24,7 @@ class TwoRoomEasy(GridWorldEnv):
         final_room_num = setup['final_room_num']
         init_room_height = setup['main_room_height']
         if middle_room_num < final_room_num:
-            raise ValueError("The number of middle rooms should be greater than that of final rooms")
+            raise ValueError("The number of middle rooms should be equal to or greater than that of final rooms")
         # create the main room
         init_room_width = middle_room_size*middle_room_num + middle_room_num-1
         init_rooms = np.ones((init_room_height, init_room_width), dtype=np.int)
@@ -44,8 +46,7 @@ class TwoRoomEasy(GridWorldEnv):
             for fr in range(final_room_num-1):
                 final_rooms = np.concatenate((final_rooms, final_room, vertical_wall), axis=1)
         final_rooms = np.delete(final_rooms, -1, 1)
-        # extend the final room matrix with blocked space (np.zeros),
-        # if the number of final rooms is less than that of middle rooms
+        # if the number of final rooms is less than that of middle rooms, block the unfilled area with 0s.
         block_room_num = middle_room_num - final_room_num
         if block_room_num != 0:
             blocked_room = np.zeros((middle_room_size, middle_room_size), dtype=np.int)
@@ -113,3 +114,52 @@ class TwoRoomEasy(GridWorldEnv):
             n[1][0] = len(world_dict) - n[1][0] - 1
 
         return world_dict, key_door_dict
+
+    def _reset_keys(self):
+
+        middle_room_width = self.env_setup['middle_room_width']
+        middle_room_height = self.env_setup['middle_room_height']
+        middle_room_num = self.env_setup['middle_room_num']
+        final_room_num = self.env_setup['final_room_num']
+        init_room_height = self.env_setup['main_room_height']
+        init_room_width = middle_room_width*middle_room_num + middle_room_num-1
+        assert middle_room_num == final_room_num
+        kls = []
+        for _ in range(middle_room_num):
+            old_mk_x = self.key_door_dict['mk'+str(_)][1]
+            old_mk_y = self.key_door_dict['mk'+str(_)][0]
+            self.world["row"+str(old_mk_y)][old_mk_x] = 1
+            old_fk_x = self.key_door_dict['fk'+str(_)][1]
+            old_fk_y = self.key_door_dict['fk'+str(_)][0]
+            self.world["row"+str(old_fk_y)][old_fk_x] = 1
+            old_fg_x = self.key_door_dict['fg'+str(_)][1]
+            old_fg_y = self.key_door_dict['fg'+str(_)][0]
+            self.world["row"+str(old_fg_y)][old_fg_x] = 1
+
+            done = False
+            while not done:
+                mkl = (r.randint(1, init_room_height),
+                       r.randint(1, init_room_width))
+                if mkl not in kls:
+                    kls.append(mkl)
+                    self.key_door_dict['mk'+str(_)] = [mkl[0],
+                                                       mkl[1]]
+                    self.world['row'+str(self.key_door_dict['mk'+str(_)][0])][self.key_door_dict['mk'+str(_)][1]] = 'mk'+str(_)
+                    done = True
+
+            done = False
+            while not done:
+                fkl = (r.randint(1, init_room_height),
+                       r.randint(1, init_room_width))
+                if fkl not in kls:
+                    kls.append(fkl)
+                    self.key_door_dict['fk'+str(_)] = [fkl[0],
+                                                       fkl[1]]
+                    self.world['row' + str(self.key_door_dict['fk'+str(_)][0])][self.key_door_dict['fk' + str(_)][1]] = 'fk' + str(_)
+
+            # randomly choose a cell in a final room to be a final goal
+            fg_xy = (r.randint(init_room_height+middle_room_height+3, init_room_height+2*middle_room_height+2),
+                     r.randint(1, middle_room_width))
+            self.key_door_dict['fg'+str(_)] = [fg_xy[0],
+                                               fg_xy[1]+(middle_room_width+1)*_]
+            self.world['row' + str(self.key_door_dict['fg'+str(_)][0])][self.key_door_dict['fg'+str(_)][1]] = 'fg' + str(_)

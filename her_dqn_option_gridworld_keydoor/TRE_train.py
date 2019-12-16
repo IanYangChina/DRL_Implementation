@@ -1,17 +1,56 @@
 import os
-from envs.gridworld_two_rooms_easy import TwoRoomEasy
 from her_dqn_option_gridworld_keydoor.trainer import Trainer
+from envs.gridworld_two_rooms_easy import TwoRoomEasy
+setup = {
+    'main_room_height': 20,
+    'middle_room_size': 7,
+    'middle_room_num': 1,
+    'final_room_num': 1,
+}
+demonstrations = [[1, 0, 2, 3, 4],
+                  [0, 1, 2, 3, 4]]
+seeds = [30, 66, 12, 25, 50]
 path = os.path.dirname(os.path.realpath(__file__))
 
-env_setup = {'middle_room_size': 5,
-             'middle_room_num': 3,
-             'final_room_num': 3,
-             'main_room_height': 20}
-folder = '/TwoRoomEasy'
-path += folder
-if not os.path.isdir(path):
-    os.mkdir(path)
-env = TwoRoomEasy(env_setup, seed=2222)
-trainer = Trainer(env, path, training_epoch=201)
-trainer.print_training_info()
-trainer.run()
+folder = "/Scale_20_7_1_1_3e4"
+current_path = path + folder
+if not os.path.isdir(current_path):
+    os.mkdir(current_path)
+for seed in seeds:
+    current_path += "/seed" + str(seed)
+    if not os.path.isdir(current_path):
+        os.mkdir(current_path)
+    env = TwoRoomEasy(setup, seed=seed)
+    trainer = Trainer(env, current_path, seed=seed, training_epoch=301, demonstrations=demonstrations,
+                      act_eps_decay=30000)
+    print("Seed {}, training starts......".format(seed))
+    trainer.run(act_optimization_steps=3, opt_optimization_steps=3)
+
+folder = "/Scale_20_7_1_1_gsrb"
+current_path = path + folder
+if not os.path.isdir(current_path):
+    os.mkdir(current_path)
+for seed in seeds:
+    current_path += "/seed" + str(seed)
+    if not os.path.isdir(current_path):
+        os.mkdir(current_path)
+    env = TwoRoomEasy(setup, seed=seed)
+    trainer = Trainer(env, current_path, seed=seed, training_epoch=301, demonstrations=demonstrations,
+                      act_exploration='GSRB')
+    print("Seed {}, training starts......".format(seed))
+    trainer.run(act_optimization_steps=3, opt_optimization_steps=3)
+
+folder = "/Scale_20_7_1_1_gsrb_demon"
+current_path = path + folder
+if not os.path.isdir(current_path):
+    os.mkdir(current_path)
+for seed in seeds:
+    current_path += "/seed" + str(seed)
+    if not os.path.isdir(current_path):
+        os.mkdir(current_path)
+    env = TwoRoomEasy(setup, seed=seed)
+    trainer = Trainer(env, current_path, seed=seed, training_epoch=301, demonstrations=demonstrations,
+                      act_exploration='GSRB',
+                      use_demonstrator_in_training=True)
+    print("Seed {}, training starts......".format(seed))
+    trainer.run(act_optimization_steps=3, opt_optimization_steps=3)

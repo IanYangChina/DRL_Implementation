@@ -7,20 +7,23 @@ class OneRoom(GridWorldEnv):
     """
     This world has one type of rooms.
     Keys are placed in the hall.
+    Ultimate goals are cells in these rooms.
+    :param random_key: if True, locations of keys will be randomly reset when reset() method is called.
     """
-    def __init__(self, env_setup, seed=2222):
-        self.env_type = "OR"
+    def __init__(self, env_setup, random_key=True, seed=2222):
         setup = env_setup.copy()
         setup['init_height'] = setup['hall_height']
         setup['init_width'] = setup['locked_room_num']*(setup['locked_room_width']+1)-1
         GridWorldEnv.__init__(self, setup, seed)
+        self.env_type = "OR"
+        self.random_key = random_key
 
     def _create_world(self, setup):
         """
             This function automatically create a world given some information of the world.
             The height of the hall room is manual given.
-            The height of the world is determined by the height of the hall room and the size of middle/final rooms.
-            The width of the world is determined by the size and number of middle/final rooms.
+            The height of the world is determined by the height of the hall room and the height of locked rooms.
+            The width of the world is determined by the width and number of locked rooms.
         """
         locked_room_height = setup['locked_room_height']
         locked_room_width = setup['locked_room_width']
@@ -36,14 +39,13 @@ class OneRoom(GridWorldEnv):
         vertical_wall = np.zeros((locked_room_height, 1), dtype=np.int)
         vertical_boundary = np.zeros((hall_height+locked_room_height+1, 1), dtype=np.int)
         # create locked rooms
-
         locked_room = np.ones((locked_room_height, locked_room_width), dtype=np.int)
         locked_rooms = np.concatenate((locked_room, vertical_wall), axis=1)
         for mr in range(locked_room_num-1):
             locked_rooms = np.concatenate((locked_rooms, locked_room, vertical_wall), axis=1)
         locked_rooms = np.delete(locked_rooms, -1, 1)
 
-        # concatenate them together, with an extra str_like list
+        # concatenate them together, transform into a list of strings
         world_np = np.concatenate((locked_rooms, horizontal_wall, hall), axis=0)
         world_np = np.concatenate((vertical_boundary, world_np, vertical_boundary), axis=1)
         world_np = np.concatenate((horizontal_boundary, world_np, horizontal_boundary), axis=0)
@@ -74,6 +76,7 @@ class OneRoom(GridWorldEnv):
                     world_str[key_door_dict['k'+str(_)][0]][key_door_dict['k'+str(_)][1]] = 'k' + str(_)
                     done = True
 
+        # create a dict object of the world from human-perspective
         world_dict = dict.fromkeys(["row"+str(len(world_np)-i-1) for i in range(len(world_np))])
         for i in range(len(world_str)):
             world_dict["row"+str(i)] = world_str[-i-1]
@@ -81,3 +84,36 @@ class OneRoom(GridWorldEnv):
             n[1][0] = len(world_dict)-n[1][0]-1
 
         return world_dict, key_door_dict
+
+    def _reset_keys(self):
+        locked_room_height = self.env_setup['locked_room_height']
+        locked_room_width = self.env_setup['locked_room_width']
+        locked_room_num = self.env_setup['locked_room_num']
+        init_room_height = self.env_setup['hall_height']
+        init_room_width = locked_room_width*locked_room_num + locked_room_num-1
+        kls = []
+        for _ in range(locked_room_num):
+            old_k_x = self.key_door_dict['k'+str(_)][1]
+            old_k_y = self.key_door_dict['k'+str(_)][0]
+            self.world["row"+str(old_k_y)][old_k_x] = 1
+            old_fg_x = self.key_door_dict['fg'+str(_)][1]
+            old_fg_y = self.key_door_dict['fg'+str(_)][0]
+            self.world["row"+str(old_fg_y)][old_fg_x] = 1
+
+            done = False
+            while not done:
+                kl = (r.randint(1, init_room_height),
+                      r.randint(1, init_room_width))
+                if kl not in kls:
+                    kls.append(kl)
+                    self.key_door_dict['k'+str(_)] = [kl[0],
+                                                      kl[1]]
+                    self.world['row'+str(self.key_door_dict['k'+str(_)][0])][self.key_door_dict['k'+str(_)][1]] = 'k'+str(_)
+                    done = True
+
+            # randomly choose a cell in a final room to be a final goal
+            fg_xy = (r.randint(init_room_height+2, init_room_height+locked_room_height+1),
+                     r.randint(1, locked_room_width))
+            self.key_door_dict['fg'+str(_)] = [fg_xy[0],
+                                               fg_xy[1]+(locked_room_width+1)*_]
+            self.world['row' + str(self.key_door_dict['fg'+str(_)][0])][self.key_door_dict['fg'+str(_)][1]] = 'fg' + str(_)

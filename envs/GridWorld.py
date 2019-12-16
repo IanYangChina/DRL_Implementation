@@ -9,23 +9,25 @@ class GridWorldEnv(object):
         An grid-world constituted by two types of rooms: a hall and some locked rooms.
         When calling function reset(), an agent will be initialized at a random cell within the hall.
         In order to enter a locked rooms, an agent needs to first collect the corresponding keys.
-        Keys are randomly placed at where you want them to be.
-        The ultimate goal-locations are cells within locked rooms.
+        Keys, doors and goals are placed at where you want them to be.
 
     --MDP Definition:
         States and goals are represented by [x, y] coordinates of the cells.
         Observation is constituted by a state, a goal and an inventory of keys.
-            The inventory is a one-hot vector whose size is the number of keys in an environment instance.
-        Primitive actions are "up", "down", "left" and "right" (deterministic actions).
+            The inventory is a one-hot vector with size of the number of keys in an environment instance.
+        Primitive actions are "up", "down", "left" and "right" (deterministic).
             Reward for primitive-agent is 1 when a desired goal given by the option-agent is achieved and 0 otherwise.
         Options are coordinates of goals.
             Reward for option-agent is 1 when an ultimate goal is achieved and 0 otherwise.
     """
     def __init__(self, setup, seed=2222):
         r.seed(seed)
-        self.world, self.key_door_dict = self._create_world(setup)
-        self.init_width = setup['init_width']
-        self.init_height = setup['init_height']
+        self.env_type = ""
+        self.random_key = True
+        self.env_setup = setup
+        self.world, self.key_door_dict = self._create_world(self.env_setup)
+        self.init_width = self.env_setup['init_width']
+        self.init_height = self.env_setup['init_height']
         self.keys = [key for key in self.key_door_dict if "k" in key]
         self.doors = [key for key in self.key_door_dict if "d" in key]
         self.final_goals = [key for key in self.key_door_dict if "fg" in key]
@@ -35,29 +37,28 @@ class GridWorldEnv(object):
         self.actions = ['up', 'down', 'left', 'right']
         self.keys_running = None
         self.world_running = None
+        self.input_max = np.array(
+            ([len(self.world['row0'])-2, len(self.world)-2, len(self.world['row0'])-2, len(self.world)-2]
+             + [1 for k in range(len(self.keys))]), dtype=np.float
+        )
+        self.input_min = np.array(
+            ([1, 1, 1, 1]+[0 for k in range(len(self.keys))]), dtype=np.float
+        )
 
-        self.input_max = np.array(([len(self.world['row0']), len(self.world)-1,
-                                    len(self.world['row0']), len(self.world)-1]
-                                   + [1 for k in range(len(self.keys))]),
-                                  dtype=np.float)
-        self.input_min = np.array(([1, 1, 1, 1]+[0 for k in range(len(self.keys))]), dtype=np.float)
-
-    def reset(self, all_goal=False, act_test=False):
+    def reset(self, act_test=False):
         """
         Every time an episode ends, call this function.
 
-        :param all_goal:  If True, all of the goals are possible to be the high level agent's desired goal.
-        :param act_test:  If True, this function only return low level observations (used for test the low level agent)
+        :param act_test:  If True, this function only return low level observations
+                          This is for testing low-level policy, or non-hierarchical agent.
         :return:          Initial observations
         """
+        if self.random_key:
+            self._reset_keys()
         self.world_running = dcp(self.world)
         self.keys_running = dcp(self.keys)
         x, y = r.randint(1, self.init_width), r.randint(1, self.init_height)
-        if not all_goal:
-            final_goal = r.choice(self.final_goals)
-        else:
-            final_goal = r.choice(self.final_goals + self.doors + self.keys)
-
+        final_goal = r.choice(self.final_goals)
         final_goal_loc = np.array(([self.key_door_dict[final_goal][1], self.key_door_dict[final_goal][0]]), dtype=np.float)
         achieved_goal = self.world_running['row'+str(y)][x]
         achieved_goal_loc = np.array(([x, y]), dtype=np.float)
@@ -76,8 +77,6 @@ class GridWorldEnv(object):
         if not act_test:
             return opt_observation, act_observation
         else:
-            act_observation['desired_goal'] = r.choice(self.goal_space)
-            act_observation['desired_goal_loc'] = self.get_goal_location(act_observation['desired_goal'])
             return act_observation
 
     def step(self, opt_obs, act_obs, action):
@@ -88,26 +87,28 @@ class GridWorldEnv(object):
         """
         act_observation = dcp(act_obs)
         act_observation_ = dcp(act_observation)
-        s, ag, ag_loc, inv, inv_vec = self._move_agent(act_observation, action)
-        act_observation_['state'], act_observation_['achieved_goal'] = s, ag
-        act_observation_['achieved_goal_loc'] = ag_loc
-        act_observation_['inventory'], act_observation_['inventory_vector'] = inv, inv_vec
-        if act_observation['desired_goal'] == act_observation_['achieved_goal']:
+        state_, achieved_goal, achieved_goal_loc, inventory, inventory_vector = self._move_agent(act_observation, action)
+        act_observation_['state'] = state_
+        act_observation_['achieved_goal'] = achieved_goal
+        act_observation_['achieved_goal_loc'] = achieved_goal_loc
+        act_observation_['inventory'] = inventory
+        act_observation_['inventory_vector'] = inventory_vector
+        if act_observation_['desired_goal'] == act_observation_['achieved_goal']:
             # option done when the low level agent achieves the opted-desired goal
             act_reward, opt_done = 1.0, True
         else:
             act_reward, opt_done = 0.0, False
 
         if opt_obs is None:
+            # When the option observation is None, this function works for non-hierarchical RL agent
             return act_observation_, act_reward, opt_done
         else:
             # get option info
-            opt_observation = dcp(opt_obs)
-            opt_observation_ = dcp(opt_observation)
-            opt_observation_['state'] = act_observation_['state'].copy()
-            opt_observation_['inventory'] = act_observation_['inventory'].copy()
-            opt_observation_['inventory_vector'] = act_observation_['inventory_vector'].copy()
-            if opt_observation['final_goal'] == act_observation_['achieved_goal']:
+            opt_observation_ = dcp(opt_obs)
+            opt_observation_['state'] = dcp(act_observation_['state'])
+            opt_observation_['inventory'] = dcp(act_observation_['inventory'])
+            opt_observation_['inventory_vector'] = dcp(act_observation_['inventory_vector'])
+            if opt_observation_['final_goal'] == act_observation_['achieved_goal']:
                 # episode done when the low level agent achieves the final goal
                 opt_reward, ep_done = 1.0, True
             else:
@@ -146,9 +147,7 @@ class GridWorldEnv(object):
         else:
             raise ValueError("Action {} does not exist".format(action))
         # _check_move() return state_ and achieved_goal
-        state_, ag, ag_loc, inv, inv_vector = self._check_move(x, y, x_, y_, observation['inventory'],
-                                                               observation['inventory_vector'])
-        return state_, ag, ag_loc, inv, inv_vector
+        return self._check_move(x, y, x_, y_, observation['inventory'], observation['inventory_vector'])
 
     def _check_move(self, x, y, x_, y_, inventory, inventory_vector):
         """
@@ -161,15 +160,12 @@ class GridWorldEnv(object):
             state_ = np.array(([x_, y_]), dtype=np.float)
         # agent picks up a key
         elif achieved_goal in self.keys_running:
-            state_ = np.array(([x_, y_]), dtype=np.float)
-            inventory.append(dcp(achieved_goal))
             ind = self.keys.index(achieved_goal)
-            if inventory_vector[ind] == 0:
+            state_ = np.array(([x_, y_]), dtype=np.float)
+            if achieved_goal not in inventory:
+                inventory.append(dcp(achieved_goal))
                 inventory_vector[ind] = 1
-            else:
-                raise ValueError("Something is wrong here")
-            self.keys_running.remove(achieved_goal)
-            self.world_running["row" + str(y_)][x_] = 1
+
         # agent attempts to open a door
         elif achieved_goal in self.doors:
             requested_key = dcp(achieved_goal)
@@ -202,6 +198,11 @@ class GridWorldEnv(object):
         return np.array(([self.key_door_dict[goal][1], self.key_door_dict[goal][0]]), dtype=np.float)
 
     def _create_world(self, setup):
-        """This function automatically create a world given some information of the world.
+        """This function is used to create a world given some setup info.
         """
         raise NotImplementedError()
+
+    def _reset_keys(self):
+        """This function is only for random key grid world
+        """
+        pass

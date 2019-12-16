@@ -92,8 +92,8 @@ class Trainer(object):
         """Testing primitive agent"""
         goal_num = len(self.env.goal_space)
         success_t = [self.env.goal_space,
-                     [0 for g in range(goal_num)],
-                     [0 for g in range(goal_num)]]
+                     [0 for _ in range(goal_num)],
+                     [0 for _ in range(goal_num)]]
         goal_ind_t = 0
         if episode_per_goal is None:
             episode_per_goal = self.testing_episode_per_goal
