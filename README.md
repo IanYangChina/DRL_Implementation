@@ -1,3 +1,5 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # DRL_Implementation
 
 - This repository will be filled with codes reproducing some DRL algos I'm interested in.
