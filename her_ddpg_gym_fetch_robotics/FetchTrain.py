@@ -3,7 +3,7 @@ import gym
 import numpy as np
 from plot import smoothed_plot
 from collections import namedtuple
-from agent.herddpg_continuous import HindsightDDPGAgent
+from agent.her_ddpg_continuous import HindsightDDPGAgent
 path = os.path.dirname(os.path.realpath(__file__))
 
 T = namedtuple("transition",
