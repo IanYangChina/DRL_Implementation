@@ -4,7 +4,7 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from agent.utils.networks import Mlp
+from agent.utils.networks import Critic
 from agent.utils.replay_buffer import ReplayBuffer, GridWorldHindsightReplayBuffer
 from agent.utils.exploration_strategy import ExpDecayGreedy, GoalSucRateBasedExpGreed
 
@@ -41,8 +41,8 @@ class OptionDQN(object):
             raise ValueError("Wrong environment type: {}, must be one of 'OR', 'TRE', 'TRH'".format(self.env_type))
 
         self.opt_exploration = ExpDecayGreedy(eps_start, eps_end, eps_decay, opt_eps_decay_start)
-        self.option_agent = Mlp(self.opt_input_dim, self.opt_output_dim).to(self.device)
-        self.option_target = Mlp(self.opt_input_dim, self.opt_output_dim).to(self.device)
+        self.option_agent = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
+        self.option_target = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_optimizer = Adam(self.option_agent.parameters(), lr=option_lr)
         self.option_memory = ReplayBuffer(opt_mem_capacity, opt_tr_namedtuple, seed=seed)
         self.opt_batch_size = opt_batch_size
@@ -56,8 +56,8 @@ class OptionDQN(object):
                                                             sub_suc_percentage=sub_suc_percentage, decay=gsrb_decay)
         else:
             raise ValueError("Specify wrong type of exploration strategy: {}".format(act_exploration))
-        self.action_agent = Mlp(self.act_input_dim, self.act_output_dim).to(self.device)
-        self.action_target = Mlp(self.act_input_dim, self.act_output_dim).to(self.device)
+        self.action_agent = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
+        self.action_target = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
         self.action_optimizer = Adam(self.action_agent.parameters(), lr=action_lr)
         self.action_memory = GridWorldHindsightReplayBuffer(act_mem_capacity, act_tr_namedtuple, seed=seed)
         self.act_batch_size = act_batch_size
@@ -71,15 +71,6 @@ class OptionDQN(object):
         self.opt_soft_update(tau=1)
         self.act_soft_update(tau=1)
         self.optimization_steps = optimization_steps
-        self.eps_start = eps_start
-        self.eps_end = eps_end
-        self.eps_decay = eps_decay
-        if opt_eps_decay_start is None:
-            self.opt_eps_decay_start = 0
-        else:
-            self.opt_eps_decay_start = opt_eps_decay_start
-        self.act_eps_threshold = 1.0
-        self.opt_eps_threshold = 1.0
 
     def select_option(self, opt_obs, ep=None):
         inputs = np.concatenate((opt_obs['state'], opt_obs['final_goal_loc'], opt_obs['inventory_vector']), axis=0)

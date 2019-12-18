@@ -39,8 +39,8 @@ class HindsightDDPGAgent(object):
                                      env_params['init_input_means'], env_params['init_input_var'],
                                      scale_factor=1, range_max=1, range_min=0)
 
-        self.critic = Critic(self.state_dim+self.goal_dim+self.action_dim).to(self.device)
-        self.critic_target = Critic(self.state_dim+self.goal_dim+self.action_dim).to(self.device)
+        self.critic = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
+        self.critic_target = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
         self.critic_optimizer = Adam(self.critic.parameters(), lr=learning_rate)
         self.clip_rate = clip_rate
         self.clip_value = -1 / (1-self.clip_rate)
