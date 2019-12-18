@@ -12,8 +12,9 @@
 - [X] Hindsight TD3 - Discrete
 
 #### Algorithms: Hierarchical
-- [ ] HIRO - Continuous
 - [X] Option Hindsight DQN - Discrete
+- [ ] OptionCritic - Continuous
+- [ ] HIRO - Continuous
 - [ ] Option Hindsight DDPG - Continuous
 
 #### Environments
