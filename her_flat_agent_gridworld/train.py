@@ -1,15 +1,19 @@
+import os
 import numpy as np
 from plot import smoothed_plot
 from copy import deepcopy as dcp
 from collections import namedtuple
 from agent.herdqn_discrete import HindsightDQN
+from agent.hertd3_discrete import HindsightTD3
 
 
 class Trainer(object):
-    def __init__(self, env, path, is_inv=True, torch_seed=0, random_seed=0,
-                 training_epoch=401, training_cycle=50, training_episode=16, training_timesteps=70,
-                 testing_episode_per_goal=50, testing_timesteps=70, testing_gap=1, saving_gap=50):
-        self.path = path
+    def __init__(self, env, path, is_inv=True, seed=0, agent_type="dqn",
+                 training_epoch=101, training_cycle=50, training_episode=16, training_timesteps=70,
+                 testing_episode_per_goal=50, testing_timesteps=70, testing_gap=1, saving_gap=10):
+        self.path = path+"/"+agent_type
+        if not os.path.isdir(self.path):
+            os.mkdir(self.path)
         self.env = env
         opt_obs, obs = self.env.reset()
         self.is_inv = is_inv
@@ -18,14 +22,20 @@ class Trainer(object):
                             'achieved_goal', 'reward', 'done'))
         env_params = {'input_max': env.input_max,
                       'input_min': env.input_min,
-                      'act_input_dim': obs['state'].shape[0] + obs['desired_goal_loc'].shape[0] + obs['inventory_vector'].shape[0],
-                      'act_output_dim': len(env.action_space),
-                      'act_max': np.max(env.action_space),
+                      'input_dim': obs['state'].shape[0] + obs['desired_goal_loc'].shape[0] + obs['inventory_vector'].shape[0],
+                      'output_dim': len(env.action_space),
+                      'max': np.max(env.action_space),
                       'env_type': env.env_type}
         if not self.is_inv:
-            env_params['act_input_dim'] = obs['state'].shape[0] + obs['desired_goal_loc'].shape[0]
-        self.agent = HindsightDQN(env_params, ActTr, is_act_inv=is_inv, path=self.path,
-                                  torch_seed=torch_seed, random_seed=random_seed)
+            env_params['input_dim'] = obs['state'].shape[0] + obs['desired_goal_loc'].shape[0]
+
+        if agent_type == "dqn":
+            self.agent = HindsightDQN(env_params, ActTr, path=self.path, seed=seed)
+        elif agent_type == "td3":
+            self.agent = HindsightTD3(env_params, ActTr, path=self.path, seed=seed)
+        else:
+            raise ValueError("Agent: {} doesn't exist, choose one among ['dqn', 'td3'], "
+                             "default type is 'dqn".format(agent_type))
 
         self.training_epoch = training_epoch
         self.training_cycle = training_cycle
@@ -83,7 +93,7 @@ class Trainer(object):
                 new_episode = False
             sus += ep_returns
             self.agent.apply_hindsight(hindsight=True)
-            self.agent.act_learn(steps=4)
+            self.agent.learn()
         self.success_rates.append(sus / self.training_episode)
         print("Epoch %i" % epo, "Cycle %i" % cyc, "SucRate {}/{}".format(int(sus), self.training_episode))
 

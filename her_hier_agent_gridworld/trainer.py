@@ -4,7 +4,7 @@ from plot import smoothed_plot, smoothed_plot_multi_line
 from copy import deepcopy as dcp
 from collections import namedtuple
 from agent.herdqn_option_discrete import OptionDQN
-from agent.demonstrator import Demonstrator
+from agent.utils.demonstrator import Demonstrator
 
 
 class Trainer(object):

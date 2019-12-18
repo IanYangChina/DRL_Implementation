@@ -1,15 +1,14 @@
 import os
 from envs.gridworld_one_room import OneRoom
-from her_dqn_gridworld_keydoor.train import Trainer
+from her_flat_agent_gridworld.train import Trainer
 path = os.path.dirname(os.path.realpath(__file__))
 
 setup = {
     'locked_room_height': 10,
     'locked_room_width': 10,
     'locked_room_num': 1,
-    'hall_height': 10,
+    'main_room_height': 10,
 }
 env = OneRoom(setup, seed=2222)
-trainer = Trainer(env, path, training_epoch=201, torch_seed=30, random_seed=30)
-trainer.print_training_info()
+trainer = Trainer(env, path, agent_type='dqn', training_epoch=51, seed=2222)
 trainer.run()

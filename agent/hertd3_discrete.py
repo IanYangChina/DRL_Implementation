@@ -63,9 +63,9 @@ class HindsightReplayBuffer(ReplayBuffer):
         return goals
 
 
-class HindsightDQN(object):
+class HindsightTD3(object):
     def __init__(self, env_params, tr_namedtuple, path=None, seed=0,
-                 lr=1e-4, mem_capacity=int(1e6), batch_size=512, tau=0.5, clip_value=5.0,
+                 lr=1e-4, mem_capacity=int(1e6), batch_size=512, tau=0.5,
                  optimization_steps=2, gamma=0.99, eps_start=1, eps_end=0.05, eps_decay=5000):
         T.manual_seed(seed)
         R.seed(seed)
@@ -77,7 +77,7 @@ class HindsightDQN(object):
             os.mkdir(self.ckpt_path)
         use_cuda = T.cuda.is_available()
         self.device = T.device("cuda" if use_cuda else "cpu")
-
+        
         self.input_dim = env_params['input_dim']
         self.output_dim = env_params['output_dim']
         self.max = env_params['max']
@@ -87,18 +87,19 @@ class HindsightDQN(object):
         self.input_min_no_inv = np.delete(self.input_min, [n for n in range(4, len(self.input_min))], axis=0)
 
         self.exploration = ExpDecayGreedy(start=eps_start, end=eps_end, decay=eps_decay)
-        self.agent = Critic(self.input_dim, self.output_dim).to(self.device)
+        self.agent_1 = Critic(self.input_dim, self.output_dim).to(self.device)
+        self.agent_2 = Critic(self.input_dim, self.output_dim).to(self.device)
+        self.optimizer_1 = Adam(self.agent_1.parameters(), lr=lr)
+        self.optimizer_2 = Adam(self.agent_2.parameters(), lr=lr)
         self.target = Critic(self.input_dim, self.output_dim).to(self.device)
-        self.optimizer = Adam(self.agent.parameters(), lr=lr)
         self.memory = HindsightReplayBuffer(mem_capacity, tr_namedtuple, seed=seed)
         self.batch_size = batch_size
 
         self.gamma = gamma
-        self.clip_value = clip_value
         self.soft_update(tau=1)
         self.tau = tau
         self.optimization_steps = optimization_steps
-
+    
     def select_action(self, obs, ep=None):
         inputs = np.concatenate((obs['state'], obs['desired_goal_loc'], obs['inventory_vector']), axis=0)
         inputs = self.scale(inputs)
@@ -115,15 +116,7 @@ class HindsightDQN(object):
             else:
                 action = T.argmax(values).item()
             return action
-
-    def apply_hindsight(self, hindsight=False):
-        if hindsight:
-            self.memory.modify_episodes()
-        self.memory.store_episodes()
-
-    def remember(self, new, *args):
-        self.memory.store_experience(new, *args)
-
+    
     def learn(self, steps=None, batch_size=None):
         if steps is None:
             steps = self.optimization_steps
@@ -145,34 +138,54 @@ class HindsightDQN(object):
             rewards = T.tensor(batch.reward, dtype=T.float).unsqueeze(1).to(self.device)
             episode_done = T.tensor(batch.done, dtype=T.float).unsqueeze(1).to(self.device)
 
-            self.agent.train()
-            self.target.eval()
-            estimated_values = self.agent(inputs).gather(1, actions)
-            maximal_next_values = self.target(inputs_).max(1)[0].view(batch_size, 1)
+            self.agent_1.train()
+            maximal_next_values_1 = self.agent_1(inputs_).max(1)[0].view(batch_size, 1)
+            self.agent_2.train()
+            maximal_next_values_2 = self.agent_2(inputs_).max(1)[0].view(batch_size, 1)
+
+            maximal_next_values = T.min(maximal_next_values_1, maximal_next_values_2).detach()
             target_values = rewards + episode_done*self.gamma*maximal_next_values
-            target_values = T.clamp(target_values, 0.0, self.clip_value)
 
-            self.optimizer.zero_grad()
-            loss = F.smooth_l1_loss(estimated_values, target_values)
-            loss.backward()
-            self.optimizer.step()
-            self.agent.eval()
+            estimated_values_1 = self.agent_1(inputs).gather(1, actions)
+            loss_1 = F.smooth_l1_loss(estimated_values_1, target_values)
+            self.optimizer_1.zero_grad()
+            loss_1.backward()
+            self.optimizer_1.step()
+            self.agent_1.eval()
+
+            estimated_values_2 = self.agent_2(inputs).gather(1, actions)
+            loss_2 = F.smooth_l1_loss(estimated_values_2, target_values)
+            self.optimizer_2.zero_grad()
+            loss_2.backward()
+            self.optimizer_2.step()
+            self.agent_2.eval()
+
             self.soft_update()
+    
+    def apply_hindsight(self, hindsight=False):
+        if hindsight:
+            self.memory.modify_episodes()
+        self.memory.store_episodes()
 
+    def remember(self, new, *args):
+        self.memory.store_experience(new, *args)
+    
     def soft_update(self, tau=None):
         if tau is None:
             tau = self.tau
-        for target_param, param in zip(self.target.parameters(), self.agent.parameters()):
+        for target_param, param in zip(self.target.parameters(), self.agent_1.parameters()):
             target_param.data.copy_(
                 target_param.data * (1.0 - tau) + param.data * tau
             )
 
     def save_network(self, epo):
-        T.save(self.agent.state_dict(), self.ckpt_path+"/ckpt_agent_epo"+str(epo)+".pt")
+        T.save(self.agent_1.state_dict(), self.ckpt_path+"/ckpt_agent_1_epo"+str(epo)+".pt")
+        T.save(self.agent_2.state_dict(), self.ckpt_path+"/ckpt_agent_2_epo"+str(epo)+".pt")
         T.save(self.target.state_dict(), self.ckpt_path+"/ckpt_target_epo"+str(epo)+".pt")
 
     def load_network(self, epo):
-        self.agent.load_state_dict(T.load(self.ckpt_path+'/ckpt_agent_epo' + str(epo)+'.pt'))
+        self.agent_1.load_state_dict(T.load(self.ckpt_path+'/ckpt_agent_1_epo' + str(epo)+'.pt'))
+        self.agent_2.load_state_dict(T.load(self.ckpt_path+'/ckpt_agent_2_epo' + str(epo)+'.pt'))
         self.target.load_state_dict(T.load(self.ckpt_path+'/ckpt_target_epo'+str(epo)+'.pt'))
 
     def scale(self, inputs):

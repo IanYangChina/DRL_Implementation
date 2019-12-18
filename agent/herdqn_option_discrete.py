@@ -4,9 +4,9 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from agent.networks import Mlp
-from agent.replay_buffer import ReplayBuffer
-from agent.exploration_strategy import ExpDecayGreedy, GoalSucRateBasedExpGreed
+from agent.utils.networks import Mlp
+from agent.utils.replay_buffer import ReplayBuffer
+from agent.utils.exploration_strategy import ExpDecayGreedy, GoalSucRateBasedExpGreed
 
 
 class ActionReplayBuffer(ReplayBuffer):

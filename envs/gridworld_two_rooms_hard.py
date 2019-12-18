@@ -7,74 +7,55 @@ class TwoRoomHard(GridWorldEnv):
     """
     This world has two types of rooms: middle and final.
     Keys for the final room are placed in the middle room that links with it.
-    Number of middle rooms and final rooms could be different, but finals should not be more than middles.
-    :param random_key: if True, locations of keys will be randomly reset when reset() method is called.
+    Number of middle rooms and final rooms are equal.
     """
     def __init__(self, env_setup, random_key=True, seed=2222):
         setup = env_setup.copy()
         setup['init_height'] = setup['main_room_height']
-        setup['init_width'] = setup['middle_room_num'] * (setup['middle_room_width'] + 1) - 1
+        setup['init_width'] = setup['locked_room_num'] * (setup['locked_room_width'] + 1) - 1
         GridWorldEnv.__init__(self, setup, seed)
         self.env_type = "TRH"
         self.random_key = random_key
 
     def _create_world(self, setup):
-        middle_room_width = setup['middle_room_width']
-        middle_room_height = setup['middle_room_height']
-        middle_room_num = setup['middle_room_num']
-        final_room_num = setup['final_room_num']
+        locked_room_width = setup['locked_room_width']
+        locked_room_height = setup['locked_room_height']
+        locked_room_num = setup['locked_room_num']
         init_room_height = setup['main_room_height']
-        if middle_room_num < final_room_num:
-            raise ValueError("The number of middle rooms should be greater than that of final rooms")
+
         # create the main room
-        init_room_width = middle_room_width*middle_room_num + middle_room_num-1
-        init_rooms = np.ones((init_room_height, init_room_width), dtype=np.int)
+        init_room_width = locked_room_width*locked_room_num + locked_room_num-1
+        init_room = np.ones((init_room_height, init_room_width), dtype=np.int)
         # create walls and boundaries
         horizontal_wall = np.zeros((1, init_room_width), dtype=np.int)
         horizontal_boundary = np.zeros((1, init_room_width+2), dtype=np.int)
-        vertical_wall = np.zeros((middle_room_height, 1), dtype=np.int)
-        vertical_boundary = np.zeros((init_room_height+middle_room_height*2+2, 1), dtype=np.int)
-        # create middle rooms
-        middle_room = np.ones((middle_room_height, middle_room_width), dtype=np.int)
-        middle_rooms = np.concatenate((middle_room, vertical_wall), axis=1)
-        for mr in range(middle_room_num-1):
-            middle_rooms = np.concatenate((middle_rooms, middle_room, vertical_wall), axis=1)
-        middle_rooms = np.delete(middle_rooms, -1, 1)
-        # create final rooms
-        final_room = np.ones((middle_room_height, middle_room_width), dtype=np.int)
-        final_rooms = np.concatenate((final_room, vertical_wall), axis=1)
-        if final_room_num > 1:
-            for fr in range(final_room_num-1):
-                final_rooms = np.concatenate((final_rooms, final_room, vertical_wall), axis=1)
-        final_rooms = np.delete(final_rooms, -1, 1)
-        # extend the final room matrix with blocked space (np.zeros),
-        # if the number of final rooms is less than that of middle rooms
-        block_room_num = middle_room_num - final_room_num
-        if block_room_num != 0:
-            blocked_room = np.zeros((middle_room_height, middle_room_width), dtype=np.int)
-            blocked_rooms = np.concatenate((blocked_room, vertical_wall), axis=1)
-            if block_room_num > 1:
-                for br in range(block_room_num-1):
-                    blocked_rooms = np.concatenate((blocked_rooms, blocked_room, vertical_wall), axis=1)
-            final_rooms = np.concatenate((blocked_rooms, final_rooms), axis=1)
-        # concatenate them together, with an extra str_like list
-        world_np = np.concatenate((final_rooms, horizontal_wall, middle_rooms, horizontal_wall, init_rooms), axis=0)
+        vertical_wall = np.zeros((locked_room_height, 1), dtype=np.int)
+        vertical_boundary = np.zeros((init_room_height+locked_room_height*2+2, 1), dtype=np.int)
+        # create locked rooms
+        locked_room = np.ones((locked_room_height, locked_room_width), dtype=np.int)
+        locked_rooms = np.concatenate((locked_room, vertical_wall), axis=1)
+        for mr in range(locked_room_num-1):
+            locked_rooms = np.concatenate((locked_rooms, locked_room, vertical_wall), axis=1)
+        locked_rooms = np.delete(locked_rooms, -1, 1)
+
+        # concatenate them together, transform into a list of strings
+        world_np = np.concatenate((locked_rooms, horizontal_wall, locked_rooms, horizontal_wall, init_room), axis=0)
         world_np = np.concatenate((vertical_boundary, world_np, vertical_boundary), axis=1)
         world_np = np.concatenate((horizontal_boundary, world_np, horizontal_boundary), axis=0)
         world_str = list(world_np.tolist())
         # create a dictionary for goals (key & doors)
-        key_door_dict = dict.fromkeys(["mk"+str(i) for i in range(middle_room_num)] +
-                                      ["fk"+str(i) for i in range(final_room_num)] +
-                                      ["md" + str(i) for i in range(middle_room_num)] +
-                                      ["fd"+str(i) for i in range(final_room_num)] +
-                                      ["fg"+str(i) for i in range(final_room_num)])
+        key_door_dict = dict.fromkeys(["mk"+str(i) for i in range(locked_room_num)] +
+                                      ["fk"+str(i) for i in range(locked_room_num)] +
+                                      ["md" + str(i) for i in range(locked_room_num)] +
+                                      ["fd"+str(i) for i in range(locked_room_num)] +
+                                      ["fg"+str(i) for i in range(locked_room_num)])
 
         # calculate the door coordinate for the first middle room
-        middle_door_x = middle_room_width // 2
+        middle_door_x = locked_room_width // 2
         kls = []
-        for _ in range(middle_room_num):
+        for _ in range(locked_room_num):
             # using 'mdi' to represent a door in the main room
-            key_door_dict['md'+str(_)] = [middle_room_height*2+2, middle_door_x+1*(_+1) + middle_room_width*_]
+            key_door_dict['md'+str(_)] = [locked_room_height*2+2, middle_door_x+1*(_+1) + locked_room_width*_]
             world_str[key_door_dict['md'+str(_)][0]][key_door_dict['md'+str(_)][1]] = 'md'+str(_)
             # randomly place the key for each middle room within the main room
             done = False
@@ -82,26 +63,26 @@ class TwoRoomHard(GridWorldEnv):
                 mkl = (r.randint(0, init_room_height-1), r.randint(1, init_room_width-1))
                 if mkl not in kls:
                     kls.append(mkl)
-                    key_door_dict['mk'+str(_)] = [mkl[0]+middle_room_height*2+3, mkl[1]+1]
+                    key_door_dict['mk'+str(_)] = [mkl[0]+locked_room_height*2+3, mkl[1]+1]
                     world_str[key_door_dict['mk'+str(_)][0]][key_door_dict['mk'+str(_)][1]] = 'mk'+str(_)
                     done = True
         # calculate the door coordinate for each final room within a middle room
-        final_door_x = middle_room_width // 2
-        for _ in range(final_room_num):
+        final_door_x = locked_room_width // 2
+        for _ in range(locked_room_num):
             # using 'fdi' to represent a door of a final room
-            key_door_dict['fd'+str(_)] = [middle_room_height+1,
-                                          final_door_x+1*(block_room_num+_+1) + middle_room_width*(block_room_num+_)]
+            key_door_dict['fd'+str(_)] = [locked_room_height+1,
+                                          final_door_x+1*(_+1) + locked_room_width*_]
             world_str[key_door_dict['fd'+str(_)][0]][key_door_dict['fd'+str(_)][1]] = 'fd'+str(_)
 
             # randomly choose a cell in a final room to be a final goal
-            fg_xy = (r.randint(0, middle_room_height-1), r.randint(0, middle_room_width-1))
+            fg_xy = (r.randint(0, locked_room_height-1), r.randint(0, locked_room_width-1))
             key_door_dict['fg'+str(_)] = [fg_xy[0]+1,
-                                          fg_xy[1]+1*(block_room_num+_+1) + middle_room_width*(block_room_num+_)]
+                                          fg_xy[1]+1*(_+1) + locked_room_width*+_]
             world_str[key_door_dict['fg'+str(_)][0]][key_door_dict['fg'+str(_)][1]] = 'fg'+str(_)
 
             # place the key of each final room within the directly connected middle room
-            fkl = (r.randint(0, middle_room_height-1), r.randint(1, middle_room_width-1))
-            key_door_dict['fk'+str(_)] = [fkl[0]+middle_room_height+2, fkl[1]+1*(_+1)+middle_room_width*_]
+            fkl = (r.randint(0, locked_room_height-1), r.randint(1, locked_room_width-1))
+            key_door_dict['fk'+str(_)] = [fkl[0]+locked_room_height+2, fkl[1]+1*(_+1)+locked_room_width*_]
             world_str[key_door_dict['fk'+str(_)][0]][key_door_dict['fk'+str(_)][1]] = 'fk'+str(_)
 
         world_dict = dict.fromkeys(["row"+str(len(world_np)-i-1) for i in range(len(world_np))])
@@ -113,16 +94,13 @@ class TwoRoomHard(GridWorldEnv):
         return world_dict, key_door_dict
 
     def _reset_keys(self):
-
-        middle_room_width = self.env_setup['middle_room_width']
-        middle_room_height = self.env_setup['middle_room_height']
-        middle_room_num = self.env_setup['middle_room_num']
-        final_room_num = self.env_setup['final_room_num']
+        locked_room_width = self.env_setup['locked_room_width']
+        locked_room_height = self.env_setup['locked_room_height']
+        locked_room_num = self.env_setup['locked_room_num']
         init_room_height = self.env_setup['main_room_height']
-        init_room_width = middle_room_width*middle_room_num + middle_room_num-1
-        assert middle_room_num == final_room_num
+        init_room_width = locked_room_width*locked_room_num + locked_room_num-1
         kls = []
-        for _ in range(middle_room_num):
+        for _ in range(locked_room_num):
             old_mk_x = self.key_door_dict['mk'+str(_)][1]
             old_mk_y = self.key_door_dict['mk'+str(_)][0]
             self.world["row"+str(old_mk_y)][old_mk_x] = 1
@@ -145,15 +123,15 @@ class TwoRoomHard(GridWorldEnv):
                     done = True
 
             # place the key of each final room within the directly connected middle room
-            fkl = (r.randint(init_room_height+2, init_room_height+middle_room_height+1),
-                   r.randint(1, middle_room_width))
+            fkl = (r.randint(init_room_height+2, init_room_height+locked_room_height+1),
+                   r.randint(1, locked_room_width))
             self.key_door_dict['fk'+str(_)] = [fkl[0],
-                                               fkl[1]+(middle_room_width+1)*_]
+                                               fkl[1]+(locked_room_width+1)*_]
             self.world['row' + str(self.key_door_dict['fk'+str(_)][0])][self.key_door_dict['fk' + str(_)][1]] = 'fk' + str(_)
 
             # randomly choose a cell in a final room to be a final goal
-            fg_xy = (r.randint(init_room_height+middle_room_height+3, init_room_height+2*middle_room_height+2),
-                     r.randint(1, middle_room_width))
+            fg_xy = (r.randint(init_room_height+locked_room_height+3, init_room_height+2*locked_room_height+2),
+                     r.randint(1, locked_room_width))
             self.key_door_dict['fg'+str(_)] = [fg_xy[0],
-                                               fg_xy[1]+(middle_room_width+1)*_]
+                                               fg_xy[1]+(locked_room_width+1)*_]
             self.world['row' + str(self.key_door_dict['fg'+str(_)][0])][self.key_door_dict['fg'+str(_)][1]] = 'fg' + str(_)

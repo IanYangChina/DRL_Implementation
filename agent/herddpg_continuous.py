@@ -4,8 +4,8 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from agent.networks import Actor, Critic
-from agent.replay_buffer import ReplayBuffer
+from agent.utils.networks import Actor, Critic
+from agent.utils.replay_buffer import ReplayBuffer
 
 
 class Normalizer(object):

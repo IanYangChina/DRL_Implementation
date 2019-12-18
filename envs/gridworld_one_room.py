@@ -8,36 +8,29 @@ class OneRoom(GridWorldEnv):
     This world has one type of rooms.
     Keys are placed in the hall.
     Ultimate goals are cells in these rooms.
-    :param random_key: if True, locations of keys will be randomly reset when reset() method is called.
     """
     def __init__(self, env_setup, random_key=True, seed=2222):
         setup = env_setup.copy()
-        setup['init_height'] = setup['hall_height']
+        setup['init_height'] = setup['main_room_height']
         setup['init_width'] = setup['locked_room_num']*(setup['locked_room_width']+1)-1
         GridWorldEnv.__init__(self, setup, seed)
         self.env_type = "OR"
         self.random_key = random_key
 
     def _create_world(self, setup):
-        """
-            This function automatically create a world given some information of the world.
-            The height of the hall room is manual given.
-            The height of the world is determined by the height of the hall room and the height of locked rooms.
-            The width of the world is determined by the width and number of locked rooms.
-        """
-        locked_room_height = setup['locked_room_height']
         locked_room_width = setup['locked_room_width']
+        locked_room_height = setup['locked_room_height']
         locked_room_num = setup['locked_room_num']
-        hall_height = setup['hall_height']
+        init_room_height = setup['main_room_height']
 
         # create the hall
-        hall_width = locked_room_width*locked_room_num + locked_room_num-1
-        hall = np.ones((hall_height, hall_width), dtype=np.int)
+        init_room_width = locked_room_width*locked_room_num + locked_room_num-1
+        init_room = np.ones((init_room_height, init_room_width), dtype=np.int)
         # create walls and boundaries
-        horizontal_wall = np.zeros((1, hall_width), dtype=np.int)
-        horizontal_boundary = np.zeros((1, hall_width+2), dtype=np.int)
+        horizontal_wall = np.zeros((1, init_room_width), dtype=np.int)
+        horizontal_boundary = np.zeros((1, init_room_width+2), dtype=np.int)
         vertical_wall = np.zeros((locked_room_height, 1), dtype=np.int)
-        vertical_boundary = np.zeros((hall_height+locked_room_height+1, 1), dtype=np.int)
+        vertical_boundary = np.zeros((init_room_height+locked_room_height+1, 1), dtype=np.int)
         # create locked rooms
         locked_room = np.ones((locked_room_height, locked_room_width), dtype=np.int)
         locked_rooms = np.concatenate((locked_room, vertical_wall), axis=1)
@@ -46,7 +39,7 @@ class OneRoom(GridWorldEnv):
         locked_rooms = np.delete(locked_rooms, -1, 1)
 
         # concatenate them together, transform into a list of strings
-        world_np = np.concatenate((locked_rooms, horizontal_wall, hall), axis=0)
+        world_np = np.concatenate((locked_rooms, horizontal_wall, init_room), axis=0)
         world_np = np.concatenate((vertical_boundary, world_np, vertical_boundary), axis=1)
         world_np = np.concatenate((horizontal_boundary, world_np, horizontal_boundary), axis=0)
         world_str = list(world_np.tolist())
@@ -69,7 +62,7 @@ class OneRoom(GridWorldEnv):
             # randomly place the key for each locked room within the hall
             done = False
             while not done:
-                kl = (r.randint(0, hall_height-1), r.randint(1, hall_width-1))
+                kl = (r.randint(0, init_room_height-1), r.randint(1, init_room_width-1))
                 if kl not in kls:
                     kls.append(kl)
                     key_door_dict['k'+str(_)] = [kl[0]+locked_room_height+2, kl[1]+1]
@@ -89,7 +82,7 @@ class OneRoom(GridWorldEnv):
         locked_room_height = self.env_setup['locked_room_height']
         locked_room_width = self.env_setup['locked_room_width']
         locked_room_num = self.env_setup['locked_room_num']
-        init_room_height = self.env_setup['hall_height']
+        init_room_height = self.env_setup['main_room_height']
         init_room_width = locked_room_width*locked_room_num + locked_room_num-1
         kls = []
         for _ in range(locked_room_num):

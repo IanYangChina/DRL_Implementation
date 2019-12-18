@@ -6,10 +6,12 @@
 - Language: Python-3.6
 - Main library: PyTorch-1.3.0, Mujoco-py-2.0.2.8, Gym-0.15.3  
 
-### Algorithms to Implement
+### Algorithms: Basic
 - [X] Hindsight DQN - Discrete
 - [X] Hindsight DDPG - Continuous
-- [ ] Hindsight TD3 - Discrete
+- [X] Hindsight TD3 - Discrete
+
+### Algorithms: Hierarchical
 - [ ] HIRO - Continuous
 - [X] Option Hindsight DQN - Discrete
 - [ ] Option Hindsight DDPG - Continuous
@@ -23,6 +25,7 @@
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)
 * [DoubleDQN](https://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/viewPaper/12389)
 * [DDPG](https://arxiv.org/abs/1509.02971)
+* [TD3](https://arxiv.org/pdf/1802.09477.pdf)
 * [PER](https://arxiv.org/abs/1511.05952)
 * [HER](http://papers.nips.cc/paper/7090-hindsight-experience-replay)
 * [HIRO](http://papers.nips.cc/paper/7591-data-efficient-hierarchical-reinforcement-learning.pdf)
@@ -33,3 +36,4 @@
 * [RL-Adventure-DDPG by higgsfield](https://github.com/higgsfield/RL-Adventure-2/blob/master/5.ddpg.ipynb)
 * [OpenAI HER Baseline](https://github.com/openai/baselines/tree/master/baselines/her)
 * [hindsight-experience-replay by TianhongDai](https://github.com/TianhongDai/hindsight-experience-replay)
+* [rlkit](https://github.com/vitchyr/rlkit)

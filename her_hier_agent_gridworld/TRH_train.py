@@ -1,5 +1,5 @@
 import os
-from her_dqn_option_gridworld_keydoor.trainer import Trainer
+from her_hier_agent_gridworld.trainer import Trainer
 from envs.gridworld_two_rooms_hard import TwoRoomHard
 setup = {
     'main_room_height': 20,
