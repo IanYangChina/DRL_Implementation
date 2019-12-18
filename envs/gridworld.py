@@ -1,5 +1,6 @@
 import numpy as np
 import random as r
+import matplotlib.pyplot as plt
 from copy import deepcopy as dcp
 
 
@@ -35,8 +36,8 @@ class GridWorldEnv(object):
         self.option_space = [op for op in range(len(self.goal_space))]
         self.action_space = [0, 1, 2, 3]
         self.actions = ['up', 'down', 'left', 'right']
-        self.keys_running = None
-        self.world_running = None
+        self.keys_running = dcp(self.keys)
+        self.world_running = dcp(self.world)
         self.input_max = np.array(
             ([len(self.world['row0'])-2, len(self.world)-2, len(self.world['row0'])-2, len(self.world)-2]
              + [1 for k in range(len(self.keys))]), dtype=np.float
@@ -79,7 +80,7 @@ class GridWorldEnv(object):
         else:
             return act_observation
 
-    def step(self, opt_obs, act_obs, action):
+    def step(self, opt_obs, act_obs, action, render=False):
         """
         System steps with a primitive action.
 
@@ -98,6 +99,9 @@ class GridWorldEnv(object):
             act_reward, opt_done = 1.0, True
         else:
             act_reward, opt_done = 0.0, False
+
+        if render:
+            self.render(state=state_)
 
         if opt_obs is None:
             # When the option observation is None, this function works for non-hierarchical RL agent
@@ -196,6 +200,26 @@ class GridWorldEnv(object):
         :return: The coordinate of a goal.
         """
         return np.array(([self.key_door_dict[goal][1], self.key_door_dict[goal][0]]), dtype=np.float)
+
+    def render(self, state=None, cmap="Reds_r"):
+        # TODO: Need a better way to render instead of creating new plot at each step
+        world = dcp(self.world_running)
+        for key in self.key_door_dict:
+            if 'd' in key:
+                world['row'+str(self.key_door_dict[key][0])][self.key_door_dict[key][1]] = 0.5
+            elif 'k' in key:
+                world['row'+str(self.key_door_dict[key][0])][self.key_door_dict[key][1]] = -0.2
+            else:
+                world['row'+str(self.key_door_dict[key][0])][self.key_door_dict[key][1]] = -0.5
+        if state is not None:
+            world['row' + str(int(state[1]))][int(state[0])] = -0.2
+        list = []
+        for key in world:
+            list.append([float(i) for i in world[key]])
+        plt.imshow(list, cmap=cmap)
+        plt.axis('off')
+        plt.show()
+        plt.pause(0.0001)
 
     def _create_world(self, setup):
         """This function is used to create a world given some setup info.

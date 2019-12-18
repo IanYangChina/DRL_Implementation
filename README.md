@@ -1,7 +1,4 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 ## DRL_Implementation
-
 - This repository will be filled with codes reproducing some DRL algos I'm interested in.
 - Language: Python-3.6
 - Main library: PyTorch-1.3.0, Mujoco-py-2.0.2.8, Gym-0.15.3  
@@ -13,7 +10,7 @@
 
 #### Algorithms: Hierarchical
 - [X] Option Hindsight DQN - Discrete
-- [ ] OptionCritic - Continuous
+- [ ] OptionCritic - Discrete & Continuous
 - [ ] HIRO - Continuous
 - [ ] Option Hindsight DDPG - Continuous
 
