@@ -20,7 +20,7 @@ env_params = {'obs_dims': obs['observation'].shape[0],
               'init_input_var': np.array(([0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98,
                                            0.98, 0.98, 0.98]))
               }
-agent = HindsightDDPGAgent(env_params, T, path=path, torch_seed=300, random_seed=300)
+agent = HindsightDDPGAgent(env_params, T, path=path, seed=300, hindsight=True)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
@@ -62,7 +62,6 @@ for epo in range(EPOCH):
         cycle_returns.append(cycle_return)
         print("Epoch %i" % epo, "cycle %i" % cyc,
               "return %0.1f" % cycle_return, "success rate %0.2f" % success_rate + "%")
-        agent.apply_hindsight()
         agent.learn()
 
     if (epo % 50 == 0) and (epo != 0):

@@ -1,4 +1,5 @@
 import random as R
+from numpy import array_equal
 
 
 class ReplayBuffer(object):
@@ -36,3 +37,111 @@ class ReplayBuffer(object):
 
     def __len__(self):
         return len(self.memory)
+
+
+"""
+Below are two replay buffer with hindsight goal relabeling support.
+    The first one is for general usage with transition tuple: 
+        ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done').
+    The second one is for the GridWorld environment designed in this repo ./envs/grid_world, with tuple:
+        ('state', 'inventory', 'desired_goal', 'action', 
+        'next_state', 'next_inventory', 'next_goal', 'achieved_goal', 
+        'reward', 'done')
+"""
+
+
+class HindsightReplayBuffer(ReplayBuffer):
+    def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
+        self.k = sampled_goal_num
+        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
+
+    def modify_episodes(self):
+        if len(self.episodes) == 0:
+            return
+        for _ in range(len(self.episodes)):
+            ep = self.episodes[_]
+            imagined_goals = self.sample_achieved_goal(ep)
+            for n in range(len(imagined_goals[0])):
+                ind = imagined_goals[0][n]
+                goal = imagined_goals[1][n]
+                modified_ep = []
+                for tr in range(ind+1):
+                    s = ep[tr].state
+                    dg = goal
+                    a = ep[tr].action
+                    ns = ep[tr].next_state
+                    ag = ep[tr].achieved_goal
+                    r = ep[tr].reward
+                    d = ep[tr].done
+                    if tr == ind:
+                        modified_ep.append(self.Transition(s, dg, a, ns, ag, -0.0, 0))
+                    else:
+                        modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+                self.episodes.append(modified_ep)
+
+    def sample_achieved_goal(self, ep):
+        goals = [[], []]
+        for _ in range(self.k):
+            done = False
+            count = 0
+            while not done:
+                count += 1
+                if count > len(ep):
+                    break
+                ind = R.randint(0, len(ep)-1)
+                goal = ep[ind].achieved_goal
+                if all(not array_equal(goal, g) for g in goals[1]):
+                    goals[0].append(ind)
+                    goals[1].append(goal)
+                    done = True
+        return goals
+
+
+class GridWorldHindsightReplayBuffer(ReplayBuffer):
+    def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
+        self.k = sampled_goal_num
+        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
+
+    def modify_episodes(self):
+        if len(self.episodes) == 0:
+            return
+        for _ in range(len(self.episodes)):
+            ep = self.episodes[_]
+            imagined_goals = self.sample_achieved_goal(ep)
+            for n in range(len(imagined_goals[0])):
+                ind = imagined_goals[0][n]
+                goal = imagined_goals[1][n]
+                modified_ep = []
+                for tr in range(ind+1):
+                    s = ep[tr].state
+                    inv = ep[tr].inventory
+                    dg = goal
+                    a = ep[tr].action
+                    ns = ep[tr].next_state
+                    ninv = ep[tr].next_inventory
+                    ng = goal
+                    ag = ep[tr].achieved_goal
+                    r = ep[tr].reward
+                    d = ep[tr].done
+                    if tr == ind:
+                        modified_ep.append(self.Transition(s, inv, dg, a, ns, ninv, ng, ag, 1.0, 0))
+                    else:
+                        modified_ep.append(self.Transition(s, inv, dg, a, ns, ninv, ng, ag, r, d))
+                self.episodes.append(modified_ep)
+
+    def sample_achieved_goal(self, ep):
+        goals = [[], []]
+        for k_ in range(self.k):
+            done = False
+            count = 0
+            while not done:
+                count += 1
+                if count > len(ep):
+                    break
+                ind = R.randint(0, len(ep)-1)
+                goal = ep[ind].achieved_goal
+                if all(not array_equal(goal, g) for g in goals[1]):
+                    goals[0].append(ind)
+                    goals[1].append(goal)
+                    done = True
+        return goals

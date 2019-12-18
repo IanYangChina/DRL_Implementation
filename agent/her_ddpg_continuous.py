@@ -4,90 +4,18 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
+from agent.utils.normalizer import Normalizer
 from agent.utils.networks import Actor, Critic
-from agent.utils.replay_buffer import ReplayBuffer
-
-
-class Normalizer(object):
-    def __init__(self, input_dims, init_mean, init_var, scale_factor=5, range_max=1, range_min=-1, epsilon=1e-2, clip_range=5):
-        self.input_dims = input_dims
-        self.sample_count = 0
-        self.history = []
-        self.history_mean = init_mean
-        self.history_var = init_var
-        self.epsilon = epsilon*np.ones(self.input_dims)
-        self.input_clip_range = (-clip_range*np.ones(self.input_dims), clip_range*np.ones(self.input_dims))
-        self.scale_factor = scale_factor
-        self.range_max = range_max*np.ones(self.input_dims)
-        self.range_min = range_min*np.ones(self.input_dims)
-
-    def store_history(self, *args):
-        self.history.append(*args)
-
-    # update mean and var for z-score normalization
-    def update_mean(self):
-        if len(self.history) == 0:
-            return
-        new_sample_num = len(self.history)
-        new_history = np.array(self.history, dtype=np.float)
-        new_mean = np.mean(new_history, axis=0)
-
-        new_var = np.sum(np.square(new_history - new_mean), axis=0)
-        new_var = (self.sample_count * self.history_var + new_var)
-        new_var /= (new_sample_num + self.sample_count)
-        self.history_var = np.sqrt(new_var)
-
-        new_mean = (self.sample_count * self.history_mean + new_sample_num * new_mean)
-        new_mean /= (new_sample_num + self.sample_count)
-        self.history_mean = new_mean
-
-        self.sample_count += new_sample_num
-        self.history.clear()
-
-    # pre-process inputs, currently using max-min-normalization
-    def __call__(self, inputs):
-        inputs = (inputs - self.history_mean) / (self.history_var+self.epsilon)
-        inputs = np.clip(inputs, self.input_clip_range[0], self.input_clip_range[1])
-        return self.scale_factor*inputs
-
-
-class HindsightReplayBuffer(ReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, seed=0):
-        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
-
-    def modify_episodes(self, k=4):
-        if len(self.episodes) == 0:
-            return
-        for k_ in range(k):
-            for _ in range(len(self.episodes)):
-                ep = self.episodes[_]
-                if len(ep) < 2+k_:
-                    continue
-                modified_ep = []
-                ind = len(ep)-1-k_
-                imagined_goal = ep[ind].achieved_goal
-                for tr in range(ind+1):
-                    s = ep[tr].state
-                    dg = imagined_goal
-                    a = ep[tr].action
-                    ns = ep[tr].next_state
-                    ag = ep[tr].achieved_goal
-                    r = ep[tr].reward
-                    d = ep[tr].done
-                    if tr == ind:
-                        modified_ep.append(self.Transition(s, dg, a, ns, ag, -0.0, 0))
-                    else:
-                        modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                self.episodes.append(modified_ep)
+from agent.utils.replay_buffer import HindsightReplayBuffer
 
 
 class HindsightDDPGAgent(object):
-    def __init__(self, env_params, transition_namedtuple, noise_deviation_rate=0.05, random_action_chance=0.2,
-                 torch_seed=0, random_seed=0,
-                 tau=0.05, batch_size=128, memory_capacity=1000000, optimization_steps=40, clip_rate=0.98,
-                 discount_factor=0.98, learning_rate=0.001, path=None):
-        T.manual_seed(torch_seed)
-        R.seed(random_seed)
+    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True,
+                 noise_deviation_rate=0.05, random_action_chance=0.2,
+                 memory_capacity=int(1e6), optimization_steps=40, tau=0.05, batch_size=128, clip_rate=0.98,
+                 discount_factor=0.98, learning_rate=0.001):
+        T.manual_seed(seed)
+        R.seed(seed)
         if path is None:
             self.ckpt_path = "ckpts"
         else:
@@ -116,8 +44,8 @@ class HindsightDDPGAgent(object):
         self.critic_optimizer = Adam(self.critic.parameters(), lr=learning_rate)
         self.clip_rate = clip_rate
         self.clip_value = -1 / (1-self.clip_rate)
-
-        self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, seed=random_seed)
+        self.hindsight = hindsight
+        self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
         self.batch_size = batch_size
 
         self.optimizer_steps = optimization_steps
@@ -138,7 +66,6 @@ class HindsightDDPGAgent(object):
                 inputs = self.normalizer(inputs)
                 inputs = T.tensor(inputs, dtype=T.float).to(self.device)
                 action = self.actor_target(inputs).cpu().detach().numpy()
-                # sigma * np.random.randn(...) + mu
                 noise = self.noise_deviation*np.random.randn(self.action_dim)
                 action += noise
                 action = np.clip(action, -self.action_max, self.action_max)
@@ -156,11 +83,10 @@ class HindsightDDPGAgent(object):
     def remember(self, new_episode, *args):
         self.buffer.store_experience(new_episode, *args)
 
-    def apply_hindsight(self):
-        self.buffer.modify_episodes()
-        self.buffer.store_episodes()
-
     def learn(self, steps=None, batch_size=None):
+        if self.hindsight:
+            self.buffer.modify_episodes()
+        self.buffer.store_episodes()
         if batch_size is None:
             batch_size = self.batch_size
         if len(self.buffer) < batch_size:

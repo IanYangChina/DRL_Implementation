@@ -5,72 +5,12 @@ import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.utils.networks import Mlp
-from agent.utils.replay_buffer import ReplayBuffer
+from agent.utils.replay_buffer import ReplayBuffer, GridWorldHindsightReplayBuffer
 from agent.utils.exploration_strategy import ExpDecayGreedy, GoalSucRateBasedExpGreed
 
 
-class ActionReplayBuffer(ReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
-        self.k = sampled_goal_num
-        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
-
-    def modify_episodes(self):
-        if len(self.episodes) == 0:
-            return
-        for _ in range(len(self.episodes)):
-            ep = self.episodes[_]
-            imagined_goals = self.sample_achieved_goal(ep)
-            for n in range(len(imagined_goals[0])):
-                ind = imagined_goals[0][n]
-                goal = imagined_goals[1][n]
-                modified_ep = []
-                for tr in range(ind+1):
-                    s = ep[tr].state
-                    inv = ep[tr].inventory
-                    dg = goal
-                    a = ep[tr].action
-                    ns = ep[tr].next_state
-                    ninv = ep[tr].next_inventory
-                    ng = goal
-                    ag = ep[tr].achieved_goal
-                    r = ep[tr].reward
-                    d = ep[tr].done
-                    if tr == ind:
-                        modified_ep.append(self.Transition(s, inv, dg, a, ns, ninv, ng, ag, 1.0, 0))
-                    else:
-                        modified_ep.append(self.Transition(s, inv, dg, a, ns, ninv, ng, ag, r, d))
-                self.episodes.append(modified_ep)
-
-    def sample_achieved_goal(self, ep):
-        goals = [[], []]
-        for k_ in range(self.k):
-            done = False
-            count = 0
-            while not done:
-                count += 1
-                if count > len(ep):
-                    break
-                ind = R.randint(0, len(ep)-1)
-                goal = ep[ind].achieved_goal
-                if all(not np.allclose(goal, g) for g in goals[1]):
-                    goals[1].append(goal)
-                    done = True
-        for g in range(len(goals[1])):
-            for ind_ in range(0, len(ep)-2):
-                if np.allclose(ep[ind_].achieved_goal, goals[1][g]):
-                    goals[0].append(ind_)
-                    break
-        return goals
-
-
-class OptionReplayBuffer(ReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, seed=0):
-        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
-
-
 class OptionDQN(object):
-    def __init__(self, env_params, opt_tr_namedtuple, act_tr_namedtuple, path=None,
-                 seed=0,
+    def __init__(self, env_params, opt_tr_namedtuple, act_tr_namedtuple, path=None, seed=0,
                  act_exploration=None, sub_suc_percentage=None, gsrb_decay=None, act_eps_decay=30000,
                  option_lr=1e-5, opt_mem_capacity=int(1e6), opt_batch_size=256, opt_tau=0.2,
                  action_lr=1e-5, act_mem_capacity=int(1e6), act_batch_size=256, act_tau=0.05, clip_value=5.0,
@@ -104,7 +44,7 @@ class OptionDQN(object):
         self.option_agent = Mlp(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_target = Mlp(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_optimizer = Adam(self.option_agent.parameters(), lr=option_lr)
-        self.option_memory = OptionReplayBuffer(opt_mem_capacity, opt_tr_namedtuple, seed=seed)
+        self.option_memory = ReplayBuffer(opt_mem_capacity, opt_tr_namedtuple, seed=seed)
         self.opt_batch_size = opt_batch_size
         self.opt_mean_q_tmp = []
         self.opt_mean_q = []
@@ -116,10 +56,10 @@ class OptionDQN(object):
                                                             sub_suc_percentage=sub_suc_percentage, decay=gsrb_decay)
         else:
             raise ValueError("Specify wrong type of exploration strategy: {}".format(act_exploration))
-        self.action_agent = Network(self.act_input_dim, self.act_output_dim).to(self.device)
-        self.action_target = Network(self.act_input_dim, self.act_output_dim).to(self.device)
+        self.action_agent = Mlp(self.act_input_dim, self.act_output_dim).to(self.device)
+        self.action_target = Mlp(self.act_input_dim, self.act_output_dim).to(self.device)
         self.action_optimizer = Adam(self.action_agent.parameters(), lr=action_lr)
-        self.action_memory = ActionReplayBuffer(act_mem_capacity, act_tr_namedtuple, seed=seed)
+        self.action_memory = GridWorldHindsightReplayBuffer(act_mem_capacity, act_tr_namedtuple, seed=seed)
         self.act_batch_size = act_batch_size
         self.act_mean_q_tmp = []
         self.act_mean_q = []
@@ -188,23 +128,21 @@ class OptionDQN(object):
         else:
             raise ValueError("Storing experience for wrong level {} has been requested".format(level))
 
-    def apply_hindsight(self, hindsight=False):
-        if hindsight:
-            self.action_memory.modify_episodes()
-        self.action_memory.store_episodes()
-        self.option_memory.store_episodes()
-
-    def learn(self, level, steps=None, batch_size=None):
+    def learn(self, level, steps=None, batch_size=None, hindsight=True):
         if steps is None:
             steps = self.optimization_steps
 
         if level == "option":
+            self.option_memory.store_episodes()
             if batch_size is None:
                 batch_size = self.opt_batch_size
             for s in range(steps):
                 self.opt_learn(batch_size)
                 self.opt_soft_update()
         elif level == "action":
+            if hindsight:
+                self.action_memory.modify_episodes()
+            self.action_memory.store_episodes()
             if batch_size is None:
                 batch_size = self.act_batch_size
             for s in range(steps):

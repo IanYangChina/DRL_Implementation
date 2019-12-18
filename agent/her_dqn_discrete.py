@@ -5,66 +5,12 @@ import random as R
 import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.utils.networks import Critic
-from agent.utils.replay_buffer import ReplayBuffer
+from agent.utils.replay_buffer import GridWorldHindsightReplayBuffer
 from agent.utils.exploration_strategy import ExpDecayGreedy
 
 
-class HindsightReplayBuffer(ReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
-        self.k = sampled_goal_num
-        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
-
-    def modify_episodes(self):
-        if len(self.episodes) == 0:
-            return
-        for _ in range(len(self.episodes)):
-            ep = self.episodes[_]
-            imagined_goals = self.sample_achieved_goal(ep)
-            for n in range(len(imagined_goals[0])):
-                ind = imagined_goals[0][n]
-                goal = imagined_goals[1][n]
-                modified_ep = []
-                for tr in range(ind+1):
-                    s = ep[tr].state
-                    inv = ep[tr].inventory
-                    dg = goal
-                    a = ep[tr].action
-                    ns = ep[tr].next_state
-                    ninv = ep[tr].next_inventory
-                    ng = goal
-                    ag = ep[tr].achieved_goal
-                    r = ep[tr].reward
-                    d = ep[tr].done
-                    if tr == ind:
-                        modified_ep.append(self.Transition(s, inv, dg, a, ns, ninv, ng, ag, 1.0, 0))
-                    else:
-                        modified_ep.append(self.Transition(s, inv, dg, a, ns, ninv, ng, ag, r, d))
-                self.episodes.append(modified_ep)
-
-    def sample_achieved_goal(self, ep):
-        goals = [[], []]
-        for k_ in range(self.k):
-            done = False
-            count = 0
-            while not done:
-                count += 1
-                if count > len(ep):
-                    break
-                ind = R.randint(0, len(ep)-1)
-                goal = ep[ind].achieved_goal
-                if all(not np.allclose(goal, g) for g in goals[1]):
-                    goals[1].append(goal)
-                    done = True
-        for g in range(len(goals[1])):
-            for ind_ in range(0, len(ep)-2):
-                if np.allclose(ep[ind_].achieved_goal, goals[1][g]):
-                    goals[0].append(ind_)
-                    break
-        return goals
-
-
 class HindsightDQN(object):
-    def __init__(self, env_params, tr_namedtuple, path=None, seed=0,
+    def __init__(self, env_params, tr_namedtuple, path=None, seed=0, hindsight=True,
                  lr=1e-4, mem_capacity=int(1e6), batch_size=512, tau=0.5, clip_value=5.0,
                  optimization_steps=2, gamma=0.99, eps_start=1, eps_end=0.05, eps_decay=5000):
         T.manual_seed(seed)
@@ -90,7 +36,8 @@ class HindsightDQN(object):
         self.agent = Critic(self.input_dim, self.output_dim).to(self.device)
         self.target = Critic(self.input_dim, self.output_dim).to(self.device)
         self.optimizer = Adam(self.agent.parameters(), lr=lr)
-        self.memory = HindsightReplayBuffer(mem_capacity, tr_namedtuple, seed=seed)
+        self.hindsight = hindsight
+        self.memory = GridWorldHindsightReplayBuffer(mem_capacity, tr_namedtuple, seed=seed)
         self.batch_size = batch_size
 
         self.gamma = gamma
@@ -116,15 +63,13 @@ class HindsightDQN(object):
                 action = T.argmax(values).item()
             return action
 
-    def apply_hindsight(self, hindsight=False):
-        if hindsight:
-            self.memory.modify_episodes()
-        self.memory.store_episodes()
-
     def remember(self, new, *args):
         self.memory.store_experience(new, *args)
 
     def learn(self, steps=None, batch_size=None):
+        if self.hindsight:
+            self.memory.modify_episodes()
+        self.memory.store_episodes()
         if steps is None:
             steps = self.optimization_steps
         if batch_size is None:

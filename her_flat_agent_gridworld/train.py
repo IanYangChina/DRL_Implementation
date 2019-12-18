@@ -30,9 +30,9 @@ class Trainer(object):
             env_params['input_dim'] = obs['state'].shape[0] + obs['desired_goal_loc'].shape[0]
 
         if agent_type == "dqn":
-            self.agent = HindsightDQN(env_params, ActTr, path=self.path, seed=seed)
+            self.agent = HindsightDQN(env_params, ActTr, path=self.path, seed=seed, hindsight=True)
         elif agent_type == "td3":
-            self.agent = HindsightTD3(env_params, ActTr, path=self.path, seed=seed)
+            self.agent = HindsightTD3(env_params, ActTr, path=self.path, seed=seed, hindsight=True)
         else:
             raise ValueError("Agent: {} doesn't exist, choose one among ['dqn', 'td3'], "
                              "default type is 'dqn".format(agent_type))
@@ -92,7 +92,6 @@ class Trainer(object):
                 obs = obs_.copy()
                 new_episode = False
             sus += ep_returns
-            self.agent.apply_hindsight(hindsight=True)
             self.agent.learn()
         self.success_rates.append(sus / self.training_episode)
         print("Epoch %i" % epo, "Cycle %i" % cyc, "SucRate {}/{}".format(int(sus), self.training_episode))

@@ -164,8 +164,7 @@ class Trainer(object):
                     new_option = False
             opt_sus += opt_ep_returns
             act_sus += act_ep_returns
-            self.agent.apply_hindsight(hindsight=self.act_hindsight)
-            self.agent.learn("action", steps=act_optimization_steps)
+            self.agent.learn("action", steps=act_optimization_steps, hindsight=True)
             self.agent.learn("option", steps=opt_optimization_steps)
         # save data
         self.opt_train_suc_rates.append(opt_sus / self.training_episode)
