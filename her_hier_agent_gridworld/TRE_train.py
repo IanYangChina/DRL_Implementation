@@ -2,10 +2,10 @@ import os
 from her_hier_agent_gridworld.trainer import Trainer
 from envs.gridworld_two_rooms_easy import TwoRoomEasy
 setup = {
-    'main_room_height': 20,
-    'middle_room_size': 7,
-    'middle_room_num': 1,
-    'final_room_num': 1,
+    'locked_room_height': 5,
+    'locked_room_width': 5,
+    'locked_room_num': 1,
+    'main_room_height': 10,
 }
 demonstrations = [[1, 0, 2, 3, 4],
                   [0, 1, 2, 3, 4]]

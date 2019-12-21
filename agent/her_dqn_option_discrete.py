@@ -179,7 +179,6 @@ class OptionDQN(object):
         self.option_optimizer.step()
 
         self.option_agent.eval()
-        return
 
     def act_learn(self, batch_size=None):
         if batch_size is None:

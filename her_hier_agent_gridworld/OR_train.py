@@ -5,7 +5,7 @@ setup = {
     'locked_room_height': 20,
     'locked_room_width': 5,
     'locked_room_num': 3,
-    'hall_height': 20,
+    'main_room_height': 20,
 }
 demonstrations = [[0, 3, 6],
                   [1, 4, 7],

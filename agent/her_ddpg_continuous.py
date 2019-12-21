@@ -54,27 +54,23 @@ class HindsightDDPGAgent(object):
         self.soft_update(tau=1)
 
     def act(self, state, desired_goal, test=False):
-        if not test:
-            inputs = np.concatenate((state, desired_goal), axis=0)
-            self.normalizer.store_history(inputs)
-            chance = R.uniform(0, 1)
-            if chance < self.random_action_chance:
-                action = np.random.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
-                return action
-            else:
-                self.actor_target.eval()
-                inputs = self.normalizer(inputs)
-                inputs = T.tensor(inputs, dtype=T.float).to(self.device)
-                action = self.actor_target(inputs).cpu().detach().numpy()
-                noise = self.noise_deviation*np.random.randn(self.action_dim)
-                action += noise
-                action = np.clip(action, -self.action_max, self.action_max)
-                return action
-        else:
+        inputs = np.concatenate((state, desired_goal), axis=0)
+        self.normalizer.store_history(inputs)
+        inputs = self.normalizer(inputs)
+        chance = R.uniform(0, 1)
+        if (not test) and (chance < self.random_action_chance):
+            action = np.random.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
+            return action
+        elif (not test) and (chance >= self.random_action_chance):
             self.actor_target.eval()
-            inputs = np.concatenate((state, desired_goal), axis=0)
-            self.normalizer.store_history(inputs)
-            inputs = self.normalizer(inputs)
+            inputs = T.tensor(inputs, dtype=T.float).to(self.device)
+            action = self.actor_target(inputs).cpu().detach().numpy()
+            noise = self.noise_deviation*np.random.randn(self.action_dim)
+            action += noise
+            action = np.clip(action, -self.action_max, self.action_max)
+            return action
+        elif test:
+            self.actor_target.eval()
             inputs = T.tensor(inputs, dtype=T.float).to(self.device)
             action = self.actor_target(inputs).cpu().detach().numpy()
             action = np.clip(action, -self.action_max, self.action_max)

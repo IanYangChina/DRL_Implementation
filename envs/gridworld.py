@@ -24,7 +24,7 @@ class GridWorldEnv(object):
     def __init__(self, setup, seed=2222):
         r.seed(seed)
         self.env_type = ""
-        self.random_key = True
+        self.random_key = False
         self.env_setup = setup
         self.world, self.key_door_dict = self._create_world(self.env_setup)
         self.init_width = self.env_setup['init_width']
@@ -94,7 +94,7 @@ class GridWorldEnv(object):
         act_observation_['achieved_goal_loc'] = achieved_goal_loc
         act_observation_['inventory'] = inventory
         act_observation_['inventory_vector'] = inventory_vector
-        if act_observation_['desired_goal'] == act_observation_['achieved_goal']:
+        if np.array_equal(act_observation_['desired_goal'], act_observation_['achieved_goal']):
             # option done when the low level agent achieves the opted-desired goal
             act_reward, opt_done = 1.0, True
         else:
@@ -160,16 +160,27 @@ class GridWorldEnv(object):
         :return: New state, achieved goal, coordinate of the achieved goal, inventory, inventory one-hot vector
         """
         achieved_goal = self.world_running["row" + str(y_)][x_]
-        if achieved_goal == 1:
-            state_ = np.array(([x_, y_]), dtype=np.float)
         # agent picks up a key
-        elif achieved_goal in self.keys_running:
+        if achieved_goal in self.keys_running:
+            # agent could only pick up one key among keys at the same level
             ind = self.keys.index(achieved_goal)
-            state_ = np.array(([x_, y_]), dtype=np.float)
-            if achieved_goal not in inventory:
-                inventory.append(dcp(achieved_goal))
-                inventory_vector[ind] = 1
+            if (self.env_type == "TRH") or (self.env_type == "TRE"):
+                if "mk" in achieved_goal:
+                    for item in inventory:
+                        if "mk" in item:
+                            inventory_vector[self.keys.index(item)] = 0
+                            inventory.remove(item)
+                elif "fk" in achieved_goal:
+                    for item in inventory:
+                        if "fk" in item:
+                            inventory_vector[self.keys.index(item)] = 0
+                            inventory.remove(item)
+            elif self.env_type == "OR":
+                inventory_vector *= 0
+                inventory = []
 
+            inventory.append(dcp(achieved_goal))
+            inventory_vector[ind] = 1
         # agent attempts to open a door
         elif achieved_goal in self.doors:
             requested_key = dcp(achieved_goal)
@@ -181,17 +192,9 @@ class GridWorldEnv(object):
                 # agent does not carry the corresponding key
                 x_ = x
                 y_ = y
-                state_ = np.array(([x_, y_]), dtype=np.float)
                 achieved_goal = self.world_running["row" + str(y_)][x_]
-            else:
-                # agent opens the door successfully
-                state_ = np.array(([x_, y_]), dtype=np.float)
-        # agent reaches a final goal
-        elif achieved_goal in self.final_goals:
-            state_ = np.array(([x_, y_]), dtype=np.float)
-        else:
-            state_ = None
-            raise ValueError("Something is wrong here")
+
+        state_ = np.array(([x_, y_]), dtype=np.float)
         achieved_goal_loc = np.array(([x_, y_]), dtype=np.float)
         return state_, achieved_goal, achieved_goal_loc, inventory, inventory_vector
 

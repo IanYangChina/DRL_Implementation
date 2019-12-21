@@ -136,6 +136,7 @@ class TwoRoomEasy(GridWorldEnv):
                     self.key_door_dict['fk'+str(_)] = [fkl[0],
                                                        fkl[1]]
                     self.world['row' + str(self.key_door_dict['fk'+str(_)][0])][self.key_door_dict['fk' + str(_)][1]] = 'fk' + str(_)
+                    done = True
 
             # randomly choose a cell in a final room to be a final goal
             fg_xy = (r.randint(init_room_height+locked_room_height+3, init_room_height+2*locked_room_height+2),

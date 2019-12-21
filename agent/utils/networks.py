@@ -40,9 +40,9 @@ class Critic(nn.Module):
 
 
 class IntraPolicy(nn.Module):
-    def __init__(self, input_dim, option_num, action_num, fc1_size=256, fc2_size=256, fc3_size=256, init_w=3e-3):
+    def __init__(self, input_dim, action_num, fc1_size=64, fc2_size=128, fc3_size=64, init_w=3e-3):
         super(IntraPolicy, self).__init__()
-        self.input_dim = input_dim+option_num
+        self.input_dim = input_dim
         self.action_dim = action_num
         self.fc1 = nn.Linear(self.input_dim, fc1_size)
         self.fc2 = nn.Linear(fc1_size, fc2_size)
@@ -62,7 +62,7 @@ class IntraPolicy(nn.Module):
         x = self.fc3(x)
         x = F.relu(x)
         termination = self.termination(x)
-        termination = F.sigmoid(termination)
+        termination = T.sigmoid(termination)
         pi = self.pi(x)
-        pi = F.softmax(pi)
+        pi = F.softmax(pi, dim=0)
         return termination, pi
