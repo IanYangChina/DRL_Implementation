@@ -15,8 +15,9 @@ class Trainer(object):
         np.set_printoptions(precision=3)
         self.path = path
         OptTr = namedtuple('OptionTransition',
-                           ('state', 'inventory', 'final_goal', 'option',
-                            'next_state', 'next_inventory', 'achieved_goal', 'reward', 'done'))
+                           ('state', 'inventory', 'desired_goal',
+                            'option', 'achieved_goal', 'reward', 'done',
+                            'next_state', 'next_inventory', 'next_goal'))
 
         self.env = env
         _, obs = self.env.reset()
@@ -49,11 +50,9 @@ class Trainer(object):
 
         for epo in range(self.training_epoch):
             for cyc in range(self.training_cycle):
-                print("Epoch %i" % epo, "Cycle %i" % cyc)
                 self.train(opt_optimization_steps=opt_optimization_steps, epo=epo, cyc=cyc)
 
             if epo % self.testing_gap == 0:
-                print("Epoch %i" % epo)
                 self.test()
             if (epo % self.saving_gap == 0) and (epo != 0):
                 self._save_ckpts(epo)
@@ -66,29 +65,31 @@ class Trainer(object):
     def train(self, opt_optimization_steps, epo=0, cyc=0):
         sus = 0
         for ep in range(self.training_episode):
+            new_episode = True
             ep_time_step = 0
             ep_done = False
             _, obs = self.env.reset()
             while (not ep_done) and (ep_time_step < self.training_timesteps):
-                option = self.agent.select_option(obs, ep=((ep+1)*(cyc+1)*(epo+1)))
+                option = self.agent.select_option(obs, ep=((ep+1)*(cyc+1)*(epo+1)*ep_time_step))
                 option_termination = False
                 while (not option_termination) and (not ep_done) and (ep_time_step < self.training_timesteps):
+                    ep_time_step += 1
                     option_termination, action = self.agent.select_action(option, obs)
                     obs_, reward, ep_done = self.env.step(None, obs, action)
                     sus += reward
                     # store transitions and renew observation
-                    self.agent.opt_remember(option_termination,
-                                            obs['state'], obs['inventory_vector'], obs['desired_goal_loc'], option,
-                                            obs_['state'], obs_['inventory_vector'], obs_['achieved_goal_loc'],
-                                            reward, 1 - int(ep_done))
+                    self.agent.opt_remember(new_episode,
+                                            obs['state'], obs['inventory_vector'], obs['desired_goal_loc'],
+                                            option, obs_['achieved_goal_loc'], reward, 1 - int(ep_done),
+                                            obs_['state'], obs_['inventory_vector'], obs_['desired_goal_loc'])
                     obs = dcp(obs_)
-
+                    new_episode = False
                     self.agent.intra_policy_learn(obs, obs_, option, action, reward, ep_done)
 
             self.agent.opt_learn(steps=opt_optimization_steps)
         # save data
         self.train_suc_rates.append(sus / self.training_episode)
-        print("Training success rate {}".format(self.train_suc_rates[-1]))
+        print("Epoch %i" % epo, "Cycle %i" % cyc, "Training success rate {}".format(self.train_suc_rates[-1]))
 
     def test(self, do_print=False, episode_per_goal=None):
         """Testing both agents"""
@@ -105,20 +106,19 @@ class Trainer(object):
             _, obs = self.env.reset()
             obs['desired_goal'] = self.env.final_goals[goal_ind]
             obs['desired_goal_loc'] = self.env.get_goal_location(obs['desired_goal'])
-            if do_print:
-                print("\nNew Episode, ultimate goal: {}".format(obs['desired_goal']))
             while (not ep_done) and (ep_time_step < self.testing_timesteps):
                 option = self.agent.select_option(obs, ep=None)
                 option_termination = False
                 while (not option_termination) and (not ep_done) and (ep_time_step < self.testing_timesteps):
                     ep_time_step += 1
-                    action = self.agent.select_action(option, obs)
+                    option_termination, action = self.agent.select_action(option, obs)
                     obs_, reward, ep_done = self.env.step(None, obs, action)
                     success[0][goal_ind] += int(reward)
                     if do_print:
-                        print("State: {}, action: {}, achieved goal: {}".format(obs['state'],
-                                                                                self.env.actions[action],
-                                                                                obs['achieved_goal']))
+                        print("State: {}, option: {}, action: {}, achieved goal: {}".format(obs['state'],
+                                                                                            option,
+                                                                                            self.env.actions[action],
+                                                                                            obs['achieved_goal']))
                     obs = dcp(obs_)
             goal_ind = (goal_ind + 1) % goal_num
         self.test_suc_rates.append(sum(success[0]) / sum(success[1]))
@@ -131,8 +131,9 @@ class Trainer(object):
     def _plot_success_rates(self):
         smoothed_plot(self.path + "/Success_rate_train.png", self.train_suc_rates, x_label="Cycle")
         smoothed_plot(self.path + "/Success_rate_test.png", self.test_suc_rates, x_label="Epoch")
-        smoothed_plot(self.path + "/Optor_mean_q.png", self.opt_mean_q, x_label="Episodes", y_label="Optor mean q value")
-        smoothed_plot(self.path + "/Actor_mean_q.png", self.act_mean_q, x_label="Timesteps", y_label="Optor mean q value")
+        smoothed_plot(self.path + "/option_policy_loss.png", self.option_policy_loss, x_label="Episodes", y_label="Optor mean q value")
+        smoothed_plot(self.path + "/intra_policy_loss.png", self.intra_policy_loss, x_label="Timesteps", y_label="Optor mean q value")
+        smoothed_plot(self.path + "/termination_loss.png", self.termination_loss, x_label="Timesteps", y_label="Optor mean q value")
 
     def _save_numpy_to_txt(self):
         path = self.path + "/data"
@@ -140,5 +141,6 @@ class Trainer(object):
             os.mkdir(path)
         np.savetxt(path+"/tr_opt.dat", np.array(self.train_suc_rates))
         np.savetxt(path+"/te_opt.dat", np.array(self.test_suc_rates))
-        np.savetxt(path+"/opt_mean_q.dat", self.opt_mean_q)
-        np.savetxt(path+"/act_mean_q.dat", self.act_mean_q)
+        np.savetxt(path+"/opt_pi_loss.dat", self.option_policy_loss)
+        np.savetxt(path+"/intra_pi_loss.dat", self.intra_policy_loss)
+        np.savetxt(path+"/term_loss.dat", self.termination_loss)
