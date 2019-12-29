@@ -54,11 +54,8 @@ class ExpDecayGreedy(object):
         self.decay_start = decay_start
 
     def __call__(self, count):
-        if self.decay_start is None:
-            epsilon = self.end + (self.start - self.end) * M.exp(-1. * count / self.decay)
-        else:
+        if self.decay_start is not None:
             count -= self.decay_start
             if count < 0:
                 count = 0
-            epsilon = self.end + (self.start - self.end) * M.exp(-1. * count / self.decay)
-        return epsilon
+        return self.end + (self.start - self.end) * M.exp(-1. * count / self.decay)

@@ -40,7 +40,7 @@ class ReplayBuffer(object):
 
 
 """
-Below are two replay buffer with hindsight goal relabeling support.
+Below are two replay buffers with hindsight goal relabeling support.
     The first one is for general usage with transition tuple: 
         ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done').
     The second one is for the GridWorld environment designed in this repo ./envs/grid_world, with tuple:

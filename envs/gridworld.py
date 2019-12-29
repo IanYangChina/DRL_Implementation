@@ -9,17 +9,19 @@ class GridWorldEnv(object):
     --Brief Introduction:
         An grid-world constituted by two types of rooms: a hall and some locked rooms.
         When calling function reset(), an agent will be initialized at a random cell within the hall.
-        In order to enter a locked rooms, an agent needs to first collect the corresponding keys.
-        Keys, doors and goals are placed at where you want them to be.
+        In order to enter a locked room, an agent needs to first collect the corresponding key.
+        Keys, doors and goals are placed at where you want them to be, by creating a _create_world() function.
 
     --MDP Definition:
         States and goals are represented by [x, y] coordinates of the cells.
         Observation is constituted by a state, a goal and an inventory of keys.
-            The inventory is a one-hot vector with size of the number of keys in an environment instance.
+            The inventory is a binary vector with size of the number of keys in an environment instance.
         Primitive actions are "up", "down", "left" and "right" (deterministic).
-            Reward for primitive-agent is 1 when a desired goal given by the option-agent is achieved and 0 otherwise.
-        Options are coordinates of goals.
-            Reward for option-agent is 1 when an ultimate goal is achieved and 0 otherwise.
+            Reward for primitive-agent is 1 when a desired goal given by the environment or a high-level agent is
+            achieved; and 0 otherwise.
+        Options are discrete indexes of goals.
+            For clarity, 'options' in this environment means 'sub-goals'.
+            Reward for a high-level agent is 1 when an ultimate goal is achieved; and 0 otherwise.
     """
     def __init__(self, setup, seed=2222):
         r.seed(seed)
@@ -40,15 +42,15 @@ class GridWorldEnv(object):
         self.world_running = dcp(self.world)
         self.input_max = np.array(
             ([len(self.world['row0'])-2, len(self.world)-2, len(self.world['row0'])-2, len(self.world)-2]
-             + [1 for k in range(len(self.keys))]), dtype=np.float
+             + [1 for _ in range(len(self.keys))]), dtype=np.float
         )
         self.input_min = np.array(
-            ([1, 1, 1, 1]+[0 for k in range(len(self.keys))]), dtype=np.float
+            ([1, 1, 1, 1]+[0 for _ in range(len(self.keys))]), dtype=np.float
         )
 
     def reset(self, act_test=False):
         """
-        Every time an episode ends, call this function.
+        Every time an new episode starts, call this function.
 
         :param act_test:  If True, this function only return low level observations
                           This is for testing low-level policy, or non-hierarchical agent.
