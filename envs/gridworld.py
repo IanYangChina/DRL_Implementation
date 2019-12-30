@@ -9,19 +9,17 @@ class GridWorldEnv(object):
     --Brief Introduction:
         An grid-world constituted by two types of rooms: a hall and some locked rooms.
         When calling function reset(), an agent will be initialized at a random cell within the hall.
-        In order to enter a locked room, an agent needs to first collect the corresponding key.
-        Keys, doors and goals are placed at where you want them to be, by creating a _create_world() function.
+        In order to enter a locked rooms, an agent needs to first collect the corresponding keys.
+        Keys, doors and goals are placed at where you want them to be.
 
     --MDP Definition:
         States and goals are represented by [x, y] coordinates of the cells.
         Observation is constituted by a state, a goal and an inventory of keys.
-            The inventory is a binary vector with size of the number of keys in an environment instance.
+            The inventory is a one-hot vector with size of the number of keys in an environment instance.
         Primitive actions are "up", "down", "left" and "right" (deterministic).
-            Reward for primitive-agent is 1 when a desired goal given by the environment or a high-level agent is
-            achieved; and 0 otherwise.
-        Options are discrete indexes of goals.
-            For clarity, 'options' in this environment means 'sub-goals'.
-            Reward for a high-level agent is 1 when an ultimate goal is achieved; and 0 otherwise.
+            Reward for primitive-agent is 1 when a desired goal given by the option-agent is achieved and 0 otherwise.
+        Options are coordinates of goals.
+            Reward for option-agent is 1 when an ultimate goal is achieved and 0 otherwise.
     """
     def __init__(self, setup, seed=2222):
         r.seed(seed)
@@ -42,20 +40,21 @@ class GridWorldEnv(object):
         self.world_running = dcp(self.world)
         self.input_max = np.array(
             ([len(self.world['row0'])-2, len(self.world)-2, len(self.world['row0'])-2, len(self.world)-2]
-             + [1 for _ in range(len(self.keys))]), dtype=np.float
+             + [1 for k in range(len(self.keys))]), dtype=np.float
         )
         self.input_min = np.array(
-            ([1, 1, 1, 1]+[0 for _ in range(len(self.keys))]), dtype=np.float
+            ([1, 1, 1, 1]+[0 for k in range(len(self.keys))]), dtype=np.float
         )
 
     def reset(self, act_test=False):
         """
-        Every time an new episode starts, call this function.
+        Every time an episode ends, call this function.
 
         :param act_test:  If True, this function only return low level observations
                           This is for testing low-level policy, or non-hierarchical agent.
         :return:          Initial observations
         """
+        plt.close()
         if self.random_key:
             self._reset_keys()
         self.world_running = dcp(self.world)
@@ -82,7 +81,7 @@ class GridWorldEnv(object):
         else:
             return act_observation
 
-    def step(self, opt_obs, act_obs, action, render=False):
+    def step(self, opt_obs, act_obs, action, t=None, render=False):
         """
         System steps with a primitive action.
 
@@ -96,14 +95,14 @@ class GridWorldEnv(object):
         act_observation_['achieved_goal_loc'] = achieved_goal_loc
         act_observation_['inventory'] = inventory
         act_observation_['inventory_vector'] = inventory_vector
-        if np.array_equal(act_observation_['desired_goal'], act_observation_['achieved_goal']):
+        if act_observation_['desired_goal'] == act_observation_['achieved_goal']:
             # option done when the low level agent achieves the opted-desired goal
             act_reward, opt_done = 1.0, True
         else:
             act_reward, opt_done = 0.0, False
 
         if render:
-            self.render(state=state_)
+            self.render(t=t, sub_goal=act_observation_['desired_goal'], action=self.actions[action], state=state_)
 
         if opt_obs is None:
             # When the option observation is None, this function works for non-hierarchical RL agent
@@ -206,8 +205,7 @@ class GridWorldEnv(object):
         """
         return np.array(([self.key_door_dict[goal][1], self.key_door_dict[goal][0]]), dtype=np.float)
 
-    def render(self, state=None, cmap="Reds_r"):
-        # TODO: Need a better way to render instead of creating new plot at each step
+    def render(self, t=None, sub_goal=None, action=None, state=None, cmap="Blues_r"):
         world = dcp(self.world_running)
         for key in self.key_door_dict:
             if 'd' in key:
@@ -221,10 +219,17 @@ class GridWorldEnv(object):
         list = []
         for key in world:
             list.append([float(i) for i in world[key]])
+        title = ""
+        if t is not None:
+            title += "Timestep: {} ".format(t)
+        if sub_goal is not None:
+            title += "Subgoal: {} ".format(sub_goal)
+        if action is not None:
+            title += "Action: {} ".format(action)
+        plt.title(title)
         plt.imshow(list, cmap=cmap)
         plt.axis('off')
-        plt.show()
-        plt.pause(0.0001)
+        plt.pause(0.00001)
 
     def _create_world(self, setup):
         """This function is used to create a world given some setup info.

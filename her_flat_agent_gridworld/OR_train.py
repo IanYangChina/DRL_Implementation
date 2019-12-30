@@ -1,6 +1,6 @@
 import os
 from envs.gridworld_one_room import OneRoom
-from her_flat_agent_gridworld.train import Trainer
+from her_flat_agent_gridworld.trainer import Trainer
 path = os.path.dirname(os.path.realpath(__file__))
 
 setup = {

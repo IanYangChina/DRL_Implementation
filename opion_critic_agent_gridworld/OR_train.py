@@ -22,4 +22,4 @@ for seed in seeds:
     trainer = Trainer(env, current_path, seed=seed,
                       training_epoch=101, testing_episode_per_goal=10, training_timesteps=30, testing_timesteps=30)
     print("{}, seed {}, training starts......".format(folder, seed))
-    trainer.run(opt_optimization_steps=1)
+    trainer.run(opt_optimization_steps=1, training_render=True)

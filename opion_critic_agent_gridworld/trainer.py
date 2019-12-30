@@ -46,14 +46,14 @@ class Trainer(object):
         self.intra_policy_loss = None
         self.termination_loss = None
 
-    def run(self, opt_optimization_steps):
+    def run(self, opt_optimization_steps, training_render=False, testing_render=False):
 
         for epo in range(self.training_epoch):
             for cyc in range(self.training_cycle):
-                self.train(opt_optimization_steps=opt_optimization_steps, epo=epo, cyc=cyc)
+                self.train(opt_optimization_steps=opt_optimization_steps, epo=epo, cyc=cyc, render=training_render)
 
             if epo % self.testing_gap == 0:
-                self.test()
+                self.test(render=testing_render)
             if (epo % self.saving_gap == 0) and (epo != 0):
                 self._save_ckpts(epo)
         self.option_policy_loss = np.array(self.agent.option_policy_loss)
@@ -62,7 +62,7 @@ class Trainer(object):
         self._plot_success_rates()
         self._save_numpy_to_txt()
 
-    def train(self, opt_optimization_steps, epo=0, cyc=0):
+    def train(self, opt_optimization_steps, epo=0, cyc=0, render=False):
         sus = 0
         for ep in range(self.training_episode):
             new_episode = True
@@ -73,9 +73,9 @@ class Trainer(object):
                 option = self.agent.select_option(obs, ep=((ep+1)*(cyc+1)*(epo+1)*ep_time_step))
                 option_termination = False
                 while (not option_termination) and (not ep_done) and (ep_time_step < self.training_timesteps):
-                    ep_time_step += 1
                     option_termination, action = self.agent.select_action(option, obs)
-                    obs_, reward, ep_done = self.env.step(None, obs, action)
+                    obs_, reward, ep_done = self.env.step(None, obs, action, t=ep_time_step, render=render)
+                    ep_time_step += 1
                     sus += reward
                     # store transitions and renew observation
                     self.agent.opt_remember(new_episode,
@@ -91,7 +91,7 @@ class Trainer(object):
         self.train_suc_rates.append(sus / self.training_episode)
         print("Epoch %i" % epo, "Cycle %i" % cyc, "Training success rate {}".format(self.train_suc_rates[-1]))
 
-    def test(self, do_print=False, episode_per_goal=None):
+    def test(self, do_print=False, episode_per_goal=None, render=False):
         """Testing both agents"""
         if episode_per_goal is None:
             episode_per_goal = self.testing_episode_per_goal
@@ -110,9 +110,9 @@ class Trainer(object):
                 option = self.agent.select_option(obs, ep=None)
                 option_termination = False
                 while (not option_termination) and (not ep_done) and (ep_time_step < self.testing_timesteps):
-                    ep_time_step += 1
                     option_termination, action = self.agent.select_action(option, obs)
-                    obs_, reward, ep_done = self.env.step(None, obs, action)
+                    obs_, reward, ep_done = self.env.step(None, obs, action, t=ep_time_step, render=render)
+                    ep_time_step += 1
                     success[0][goal_ind] += int(reward)
                     if do_print:
                         print("State: {}, option: {}, action: {}, achieved goal: {}".format(obs['state'],

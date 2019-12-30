@@ -58,17 +58,17 @@ class Trainer(object):
         print("Sub-goals:")
         print(self.env.goal_space)
 
-    def run(self):
+    def run(self, training_render=False, testing_render=False):
         for epo in range(self.training_epoch):
             for cyc in range(self.training_cycle):
-                self.train(epo=epo, cyc=cyc)
+                self.train(epo=epo, cyc=cyc, render=training_render)
             if epo % self.testing_gap == 0:
-                self.test()
+                self.test(render=testing_render)
             if (epo % self.saving_gap == 0) and (epo != 0):
                 self.agent.save_network(epo)
         self._plot_success_rates()
 
-    def train(self, epo=0, cyc=0):
+    def train(self, epo=0, cyc=0, render=False):
         sus = 0
         for ep in range(self.training_episode):
             new_episode = True
@@ -77,9 +77,9 @@ class Trainer(object):
             ep_done = False
             obs = self.env.reset(act_test=True)
             while (not ep_done) and (ep_time_step < self.training_timesteps):
-                ep_time_step += 1
                 action = self.agent.select_action(obs, ep=((ep + 1) * (cyc + 1) * (epo + 1)))
-                obs_, reward, ep_done = self.env.step(None, obs, action)
+                obs_, reward, ep_done = self.env.step(None, obs, action, t=ep_time_step, render=render)
+                ep_time_step += 1
                 obs['achieved_goal_loc'] = dcp(obs_['achieved_goal_loc'])
                 ep_returns += reward
                 # store transitions and renew observation
@@ -96,7 +96,7 @@ class Trainer(object):
         self.success_rates.append(sus / self.training_episode)
         print("Epoch %i" % epo, "Cycle %i" % cyc, "SucRate {}/{}".format(int(sus), self.training_episode))
 
-    def test(self, do_print=False, episode_per_goal=None):
+    def test(self, do_print=False, episode_per_goal=None, render=False):
 
         """Testing primitive agent"""
         goal_num = len(self.env.goal_space)
@@ -117,9 +117,9 @@ class Trainer(object):
             if do_print:
                 print("\nNew Episode, desired goal: {}".format(obs_t['desired_goal']))
             while (not ep_done_t) and (ep_time_step_t < self.testing_timesteps):
-                ep_time_step_t += 1
                 action_t = self.agent.select_action(obs_t)
-                obs_t_, reward_t, ep_done_t = self.env.step(None, obs_t, action_t)
+                obs_t_, reward_t, ep_done_t = self.env.step(None, obs_t, action_t, t=ep_time_step_t, render=render)
+                ep_time_step_t += 1
                 success_t[1][goal_ind_t] += int(reward_t)
                 obs_t['achieved_goal'] = dcp(obs_t_['achieved_goal'])
                 obs_t['achieved_goal_loc'] = dcp(obs_t_['achieved_goal_loc'])

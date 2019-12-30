@@ -139,11 +139,11 @@ class Trainer(object):
                 act_obs['desired_goal'] = self.env.goal_space[option]
                 act_obs['desired_goal_loc'] = self.env.get_goal_location(act_obs['desired_goal'])
                 while (not opt_done) and (not ep_done) and (ep_time_step < self.training_timesteps):
-                    ep_time_step += 1
                     action = self.agent.select_action(act_obs, ep=((ep + 1) * (cyc + 1) * (epo + 1)))
                     act_obs_, act_reward, ep_done, opt_obs_, opt_reward, opt_done = self.env.step(opt_obs,
                                                                                                   act_obs,
                                                                                                   action)
+                    ep_time_step += 1
                     opt_ep_returns += opt_reward
                     act_ep_returns += act_reward
                     success[0][option] += act_reward
@@ -170,13 +170,9 @@ class Trainer(object):
         self.opt_train_suc_rates.append(opt_sus / self.training_episode)
         self.act_train_suc_rates.append(act_sus / sum(success[1]))
         self.opt_train_goal_counts[-1] += np.array(success[1])
-        self.act_train_suc_rates_per_goal_ep += np.array(success[0])/np.array(success[1])
-        nan_ind = np.argwhere(np.isnan(self.act_train_suc_rates_per_goal_ep))
-        if nan_ind.shape[0] > 0:
-            for ind in range(nan_ind.shape[0]):
-                self.act_train_suc_rates_per_goal_ep[nan_ind[ind][0]] = 0
+        self.act_train_suc_rates_per_goal_ep += np.nan_to_num(np.array(success[0])/np.array(success[1]))
 
-    def act_test(self, do_print=False, episode_per_demon=None):
+    def act_test(self, do_print=False, episode_per_demon=None, render=False):
         demon_ind = 0
         demon_num = len(self.demonstrations)
         if episode_per_demon is None:
@@ -202,9 +198,10 @@ class Trainer(object):
                 if do_print:
                     print("Option/subgoal: {}".format(act_obs['desired_goal']))
                 while (not goal_done) and (not dem_done) and (ep_time_step < self.testing_timesteps):
-                    ep_time_step += 1
                     action = self.agent.select_action(act_obs, ep=None)
-                    act_obs_, act_reward, goal_done = self.env.step(None, act_obs, action)
+                    act_obs_, act_reward, goal_done = self.env.step(None, act_obs, action,
+                                                                    t=ep_time_step, render=render)
+                    ep_time_step += 1
                     success[0][goal_ind] += act_reward
                     dem_return += int(act_reward)
                     if do_print:
@@ -224,7 +221,7 @@ class Trainer(object):
         print("Action policy test result:", success)
         print("Demonstration test result:", dem_success)
 
-    def opt_test(self, do_print=False, episode_per_goal=None):
+    def opt_test(self, do_print=False, episode_per_goal=None, render=False):
         """Testing both agents"""
         if episode_per_goal is None:
             episode_per_goal = self.testing_episode_per_goal
@@ -249,10 +246,10 @@ class Trainer(object):
                 if do_print:
                     print("Option/subgoal: {}".format(act_obs['desired_goal']))
                 while (not opt_done) and (not ep_done) and (ep_time_step < self.testing_timesteps):
-                    ep_time_step += 1
                     action = self.agent.select_action(act_obs, ep=None)
                     act_obs_, act_reward, ep_done, opt_obs_, opt_reward, opt_done = \
-                        self.env.step(opt_obs, act_obs, action)
+                        self.env.step(opt_obs, act_obs, action, t=ep_time_step, render=render)
+                    ep_time_step += 1
                     success[0][goal_ind] += int(opt_reward)
                     if do_print:
                         print("State: {}, action: {}, achieved goal: {}".format(act_obs['state'],
