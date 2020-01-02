@@ -2,7 +2,7 @@ import numpy as np
 
 
 class Normalizer(object):
-    def __init__(self, input_dims, init_mean, init_var, scale_factor=5, range_max=1, range_min=-1, epsilon=1e-2, clip_range=5):
+    def __init__(self, input_dims, init_mean, init_var, scale_factor=1, epsilon=1e-2, clip_range=5):
         self.input_dims = input_dims
         self.sample_count = 0
         self.history = []
@@ -11,8 +11,6 @@ class Normalizer(object):
         self.epsilon = epsilon*np.ones(self.input_dims)
         self.input_clip_range = (-clip_range*np.ones(self.input_dims), clip_range*np.ones(self.input_dims))
         self.scale_factor = scale_factor
-        self.range_max = range_max*np.ones(self.input_dims)
-        self.range_min = range_min*np.ones(self.input_dims)
 
     def store_history(self, *args):
         self.history.append(*args)
