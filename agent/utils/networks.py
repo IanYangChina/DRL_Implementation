@@ -37,7 +37,6 @@ class StochasticActor(nn.Module):
         T.nn.init.uniform_(self.log_std.bias.data, -init_w, init_w)
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
-        self.normal_noise = Normal(0, 1)
 
     def forward(self, inputs):
         x = F.relu(self.fc1(inputs))
@@ -51,12 +50,13 @@ class StochasticActor(nn.Module):
     def get_action(self, inputs, epsilon=1e-6, probs=False):
         mean, log_std = self(inputs)
         std = log_std.exp()
-        z = self.normal_noise.sample()
-        action = T.tanh(mean+log_std*z)
+        mu = Normal(mean, std)
+        z = mu.sample()
+        action = T.tanh(z)
         if not probs:
             return action
         else:
-            log_probs = Normal(mean, std).log_prob(mean+log_std*z) - T.log(1-action.pow(2)+epsilon)
+            log_probs = mu.log_prob(z) - T.log(1-action.pow(2)+epsilon).sum(1, keepdim=True)
             return action, log_probs
 
 
