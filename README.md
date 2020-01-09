@@ -3,6 +3,7 @@
 - Most algorithms remain untested because my PC is occupied by my current research experiments.
 - Language: Python-3.6
 - Main library: PyTorch-1.3.0, Mujoco-py-2.0.2.8, Gym-0.15.3  
+- Current status: under development
 
 #### Algorithms: Flat
 - [X] DQN - Hindsight, Deterministic, Discrete
