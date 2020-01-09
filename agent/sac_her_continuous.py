@@ -34,7 +34,7 @@ class HindsightSACAgent(object):
         self.hindsight = hindsight
         self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
         self.batch_size = batch_size
-        self.optimizer_steps = optimization_steps
+        self.optimization_steps = optimization_steps
         self.gamma = discount_factor
 
         self.actor = StochasticActor(self.state_dim+self.goal_dim, self.action_dim,
@@ -77,7 +77,7 @@ class HindsightSACAgent(object):
         if len(self.buffer) < batch_size:
             return
         if steps is None:
-            steps = self.optimizer_steps
+            steps = self.optimization_steps
 
         for i in range(steps):
             batch = self.buffer.sample(batch_size)

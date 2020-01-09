@@ -3,8 +3,8 @@ import numpy as np
 from plot import smoothed_plot
 from copy import deepcopy as dcp
 from collections import namedtuple
-from agent.her_dqn_discrete import HindsightDQN
-from agent.her_td3_discrete import HindsightTD3
+from agent.dqn_her_discrete import HindsightDQN
+from agent.td3_her_discrete import HindsightTD3
 
 
 class Trainer(object):

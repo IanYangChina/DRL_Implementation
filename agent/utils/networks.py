@@ -105,3 +105,52 @@ class IntraPolicy(nn.Module):
         pi = self.pi(x)
         pi = F.softmax(pi, dim=0)
         return termination, pi
+
+
+class ContinuousIntraPolicy(nn.Module):
+    def __init__(self, input_dim, action_num, log_std_min, log_std_max,
+                 fc1_size=64, fc2_size=128, fc3_size=64, init_w=3e-3):
+        super(ContinuousIntraPolicy, self).__init__()
+        self.input_dim = input_dim
+        self.action_dim = action_num
+        self.fc1 = nn.Linear(input_dim, fc1_size)
+        self.fc2 = nn.Linear(fc1_size, fc2_size)
+        self.fc3 = nn.Linear(fc2_size, fc3_size)
+        self.mean = nn.Linear(fc3_size, self.action_dim)
+        T.nn.init.uniform_(self.mean.weight.data, -init_w, init_w)
+        T.nn.init.uniform_(self.mean.bias.data, -init_w, init_w)
+        self.log_std = nn.Linear(fc3_size, self.action_dim)
+        T.nn.init.uniform_(self.log_std.weight.data, -init_w, init_w)
+        T.nn.init.uniform_(self.log_std.bias.data, -init_w, init_w)
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+
+        self.termination = nn.Linear(fc3_size, 1)
+        self.termination.weight.data.uniform_(-init_w, init_w)
+        self.termination.bias.data.uniform_(-init_w, init_w)
+
+    def forward(self, inputs):
+        x = self.fc1(inputs)
+        x = F.relu(x)
+        x = self.fc2(x)
+        x = F.relu(x)
+        x = self.fc3(x)
+        x = F.relu(x)
+        termination = self.termination(x)
+        termination = T.sigmoid(termination)
+        mean = self.mean(x)
+        log_std = self.log_std(x)
+        log_std = T.clamp(log_std, self.log_std_min, self.log_std_max)
+        return termination, mean, log_std
+
+    def get_action(self, inputs, probs=False):
+        termination, mean, log_std = self(inputs)
+        std = log_std.exp()
+        mu = Normal(mean, std)
+        z = mu.sample()
+        action = T.tanh(z)
+        if not probs:
+            return termination, action
+        else:
+            log_probs = mu.log_prob(z)
+            return termination, action, log_probs

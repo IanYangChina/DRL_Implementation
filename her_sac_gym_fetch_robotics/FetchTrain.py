@@ -3,7 +3,7 @@ import gym
 import numpy as np
 from plot import smoothed_plot
 from collections import namedtuple
-from agent.her_sac_continuous import HindsightSACAgent
+from agent.sac_her_continuous import HindsightSACAgent
 path = os.path.dirname(os.path.realpath(__file__))
 
 T = namedtuple("transition",

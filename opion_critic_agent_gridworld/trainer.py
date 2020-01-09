@@ -1,9 +1,9 @@
 import os
 import numpy as np
-from plot import smoothed_plot, smoothed_plot_multi_line
+from plot import smoothed_plot
 from copy import deepcopy as dcp
 from collections import namedtuple
-from agent.option_critic import OptionCritic
+from agent.option_critic_discrete import OptionCritic
 
 
 class Trainer(object):

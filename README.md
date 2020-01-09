@@ -1,29 +1,32 @@
 ## DRL_Implementation
 - This repository will be filled with codes reproducing some DRL algos I'm interested in.
+- Most algorithms remain untested because my PC is occupied by my current research experiments.
 - Language: Python-3.6
 - Main library: PyTorch-1.3.0, Mujoco-py-2.0.2.8, Gym-0.15.3  
 
-#### Algorithms: Basic
-- [X] Hindsight DQN - Discrete
-- [X] Hindsight DDPG - Continuous
-- [X] Hindsight TD3 - Discrete
+#### Algorithms: Flat
+- [X] DQN - Hindsight, Deterministic, Discrete
+- [X] DDPG - Hindsight, Deterministic, Continuous
+- [X] TD3 - Hindsight, Deterministic, Discrete
+- [X] SAC - Hindsight, (Adaptive Temperature) - Stochastic, Continuous
 
 #### Algorithms: Hierarchical
-- [X] Option Hindsight DQN - Discrete
-- [ ] OptionCritic - Discrete & Continuous
-- [ ] HIRO - Continuous
-- [ ] Option Hindsight DDPG - Continuous
+- [X] Option DQN - Hindsight, Deterministic, Discrete
+- [ ] Option DDPG - Hindsight, Deterministic, Continuous
+- [X] Option Critic - Hindsight, Stochastic, Discrete & Continuous
+- [ ] HIRO - Hindsight, Deterministic, Continuous
 
 #### Environments
 - [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal, Customized)
 - [X] OpenAI Gym Mujoco Robotic Goal Environment (Continuous, Official)
-- [ ] OpenAI Gym Mujoco Robotic Multi-goal Environment (Continuous, Customized)
+- [ ] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous, Customized)
 
 #### Reference Papers
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)
 * [DoubleDQN](https://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/viewPaper/12389)
 * [DDPG](https://arxiv.org/abs/1509.02971)
 * [TD3](https://arxiv.org/pdf/1802.09477.pdf)
+* [SAC (Adaptive Temperature)](https://arxiv.org/pdf/1812.05905.pdf)
 * [PER](https://arxiv.org/abs/1511.05952)
 * [HER](http://papers.nips.cc/paper/7090-hindsight-experience-replay)
 * [HIRO](http://papers.nips.cc/paper/7591-data-efficient-hierarchical-reinforcement-learning.pdf)
