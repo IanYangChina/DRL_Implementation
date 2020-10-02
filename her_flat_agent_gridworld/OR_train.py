@@ -11,4 +11,6 @@ setup = {
 }
 env = OneRoom(setup, seed=2222)
 trainer = Trainer(env, path, agent_type='dqn', training_epoch=51, seed=2222)
-trainer.run()
+trainer.agent.load_network(epo=50)
+# trainer.run()
+trainer.test(render=True, given_goal=1)

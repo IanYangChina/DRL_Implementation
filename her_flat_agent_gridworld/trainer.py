@@ -96,7 +96,7 @@ class Trainer(object):
         self.success_rates.append(sus / self.training_episode)
         print("Epoch %i" % epo, "Cycle %i" % cyc, "SucRate {}/{}".format(int(sus), self.training_episode))
 
-    def test(self, do_print=False, episode_per_goal=None, render=False):
+    def test(self, do_print=False, episode_per_goal=None, render=False, given_goal=None):
 
         """Testing primitive agent"""
         goal_num = len(self.env.goal_space)
@@ -107,6 +107,9 @@ class Trainer(object):
         if episode_per_goal is None:
             episode_per_goal = self.testing_episode_per_goal
         episodes = goal_num*episode_per_goal
+        if given_goal is not None:
+            goal_ind_t = given_goal
+            episodes = episode_per_goal
         for ep_t in range(episodes):
             obs_t = self.env.reset(act_test=True)
             obs_t['desired_goal'] = self.env.goal_space[goal_ind_t]
@@ -128,7 +131,8 @@ class Trainer(object):
                                                                             self.env.actions[action_t],
                                                                             obs_t['achieved_goal']))
                 obs_t = obs_t_.copy()
-            goal_ind_t = (goal_ind_t + 1) % goal_num
+            if given_goal is None:
+                goal_ind_t = (goal_ind_t + 1) % goal_num
         self.test_sus_rates.append(sum(success_t[1]) / sum(success_t[2]))
         print("Primitive agent test result:\n", success_t)
 
