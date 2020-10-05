@@ -8,6 +8,28 @@ class ReplayBuffer(object):
         self.capacity = capacity
         self.memory = []
         self.position = 0
+        self.Transition = tr_namedtuple
+
+    def store_experience(self, *args):
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.position] = self.Transition(*args)
+        self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size):
+        batch = R.sample(self.memory, batch_size)
+        return self.Transition(*zip(*batch))
+
+    def __len__(self):
+        return len(self.memory)
+
+
+class EpisodeWiseReplayBuffer(object):
+    def __init__(self, capacity, tr_namedtuple, seed=0):
+        R.seed(seed)
+        self.capacity = capacity
+        self.memory = []
+        self.position = 0
         self.episodes = []
         self.ep_position = -1
         self.Transition = tr_namedtuple
@@ -50,10 +72,10 @@ Below are two replay buffers with hindsight goal relabeling support.
 """
 
 
-class HindsightReplayBuffer(ReplayBuffer):
+class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
         self.k = sampled_goal_num
-        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
+        EpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
     def modify_episodes(self):
         if len(self.episodes) == 0:
@@ -97,10 +119,10 @@ class HindsightReplayBuffer(ReplayBuffer):
         return goals
 
 
-class GridWorldHindsightReplayBuffer(ReplayBuffer):
+class GridWorldHindsightReplayBuffer(EpisodeWiseReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
         self.k = sampled_goal_num
-        ReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
+        EpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
     def modify_episodes(self):
         if len(self.episodes) == 0:

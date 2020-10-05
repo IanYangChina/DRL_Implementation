@@ -154,3 +154,25 @@ class ContinuousIntraPolicy(nn.Module):
         else:
             log_probs = mu.log_prob(z)
             return termination, action, log_probs
+
+
+class DQNetwork(nn.Module):
+    def __init__(self, action_dims, num_channels=4, init_w=3e-3):
+        super(DQNetwork, self).__init__()
+        self.ConV1 = nn.Conv2d(num_channels, 32, kernel_size=8, stride=4)
+        self.ConV2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        self.ConV3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.conv_out_dim = 64*7*7
+        self.fc = nn.Linear(self.conv_out_dim, 512)
+        self.v = nn.Linear(512, action_dims)
+        T.nn.init.uniform_(self.v.weight.data, -init_w, init_w)
+        T.nn.init.uniform_(self.v.bias.data, -init_w, init_w)
+
+    def forward(self, obs):
+        x = F.relu(self.ConV1(obs))
+        x = F.relu(self.ConV2(x))
+        x = F.relu(self.ConV3(x))
+        x = x.view(-1, self.conv_out_dim)
+        x = F.relu(self.fc(x))
+        value = self.v(x)
+        return value

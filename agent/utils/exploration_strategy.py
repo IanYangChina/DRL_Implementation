@@ -59,3 +59,20 @@ class ExpDecayGreedy(object):
             if count < 0:
                 count = 0
         return self.end + (self.start - self.end) * M.exp(-1. * count / self.decay)
+
+
+class LinearDecayGreedy(object):
+    def __init__(self,  start=1, end=0.1, decay=1000000, decay_start=None):
+        self.start = start
+        self.end = end
+        self.decay = decay
+        self.decay_start = decay_start
+
+    def __call__(self, count):
+        if self.decay_start is not None:
+            count -= self.decay_start
+            if count < 0:
+                count = 0
+            if count > self.decay:
+                count = self.dacay
+        return self.start - count*(self.start - self.end)/self.decay
