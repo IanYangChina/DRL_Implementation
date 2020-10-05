@@ -14,7 +14,7 @@ Tr = namedtuple('Transition', ('observation', 'action', 'next_observation', 'rew
 
 class DQN(object):
     def __init__(self, env_params, path=None, seed=0,
-                 lr=0.00025, mem_capacity=int(1e6), batch_size=32, tau=1.0,
+                 lr=0.00025, mem_capacity=int(2e5), batch_size=32, tau=1.0,
                  optimization_steps=1, gamma=0.99, eps_start=1, eps_end=0.1, eps_decay=1000000):
         """Seeding"""
         T.manual_seed(seed)

@@ -9,8 +9,7 @@ from plot import smoothed_plot
 
 class Trainer(object):
     def __init__(self, path, env='Breakout-v0', seed=0, training_episode=2001, training_timesteps=200, saving_gap=10,
-                 frame_skip=4,
-                 main_net_update_frequency=4, target_net_update_frequency=10000):
+                 frame_skip=4, main_net_update_frequency=4, target_net_update_frequency=10000):
         self.path = path + "/results"
         if not os.path.isdir(self.path):
             os.mkdir(self.path)
