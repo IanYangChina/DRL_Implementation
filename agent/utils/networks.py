@@ -172,7 +172,7 @@ class DQNetwork(nn.Module):
         x = F.relu(self.ConV1(obs))
         x = F.relu(self.ConV2(x))
         x = F.relu(self.ConV3(x))
-        x = x.view(-1, self.conv_out_dim)
+        x = x.view(-1, self.conv_out_dim)  # flatten operation
         x = F.relu(self.fc(x))
         value = self.v(x)
         return value

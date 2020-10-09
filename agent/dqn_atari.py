@@ -14,7 +14,7 @@ Tr = namedtuple('Transition', ('observation', 'action', 'next_observation', 'rew
 
 class DQN(object):
     def __init__(self, env_params, path=None, seed=0,
-                 lr=0.00025, mem_capacity=int(2e5), batch_size=32, tau=1.0,
+                 lr=0.00025, mem_capacity=int(1e6), batch_size=32, tau=1.0,
                  optimization_steps=1, gamma=0.99, eps_start=1, eps_end=0.1, eps_decay=1000000):
         """Seeding"""
         T.manual_seed(seed)
@@ -99,8 +99,6 @@ class DQN(object):
             self.optimizer.step()
             """Put the main network back to evaluation mode (optional)"""
             self.agent.eval()
-            """Copy some proportion of the values of the parameters of the MAIN network, to the target network"""
-            self.soft_update()
 
     def soft_update(self, tau=None):
         if tau is None:
@@ -117,8 +115,3 @@ class DQN(object):
     def load_network(self, epo):
         self.agent.load_state_dict(T.load(self.ckpt_path+'/ckpt_agent_epo' + str(epo)+'.pt'))
         self.target.load_state_dict(T.load(self.ckpt_path+'/ckpt_target_epo'+str(epo)+'.pt'))
-
-    def scale(self, inputs):
-        """Min-max feature scaling into [0, 1] (linear transformation)"""
-        _ = (inputs - self.input_min) / (self.input_max - self.input_min)
-        return _

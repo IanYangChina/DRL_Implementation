@@ -110,7 +110,7 @@ class Trainer(object):
             if (ep % self.saving_gap == 0) or (ep == self.training_episode-1):
                 self.agent.save_network(ep)
 
-        smoothed_plot("ep_returns.png", self.training_return, x_label="Episodes", window=20)
+        smoothed_plot(self.path+"/ep_returns.png", self.training_return, x_label="Episodes", window=20)
 
     def pre_process(self, frame):
         # https://github.com/R-Stefano/DQN/blob/8c4d5634453bbb130ecf4624fff09987b107ec84/DQN.py#L207

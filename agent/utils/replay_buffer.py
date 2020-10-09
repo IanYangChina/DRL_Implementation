@@ -7,7 +7,7 @@ class ReplayBuffer(object):
         R.seed(seed)
         self.capacity = capacity
         self.memory = []
-        self.position = 0
+        self.position = 0  # 99, rewrite from the 0-th transition
         self.Transition = tr_namedtuple
 
     def store_experience(self, *args):
@@ -17,7 +17,7 @@ class ReplayBuffer(object):
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
-        batch = R.sample(self.memory, batch_size)
+        batch = R.sample(self.memory, batch_size)  # uniform sampling
         return self.Transition(*zip(*batch))
 
     def __len__(self):

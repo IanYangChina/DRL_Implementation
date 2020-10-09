@@ -62,7 +62,7 @@ class ExpDecayGreedy(object):
 
 
 class LinearDecayGreedy(object):
-    def __init__(self,  start=1, end=0.1, decay=1000000, decay_start=None):
+    def __init__(self,  start=1.0, end=0.1, decay=1000000, decay_start=None):
         self.start = start
         self.end = end
         self.decay = decay
