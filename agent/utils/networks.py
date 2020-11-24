@@ -56,7 +56,7 @@ class StochasticActor(nn.Module):
         if not probs:
             return action
         else:
-            log_probs = mu.log_prob(z) - T.log(1-action.pow(2)+epsilon).sum(1, keepdim=True)
+            log_probs = (mu.log_prob(z) - T.log(1-action.pow(2)+epsilon)).sum(1, keepdim=True)
             return action, log_probs
 
 

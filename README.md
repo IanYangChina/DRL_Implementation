@@ -20,7 +20,8 @@
 
 #### Environments
 - [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal, Customized)
-- [X] OpenAI Gym Mujoco Robotic Goal Environment (Continuous, Official)
+- [X] OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous, Official)
+- [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics Multigoal Pybullet Migration) (Continuous, Official)
 - [ ] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous, Customized)
 
 #### Reference Papers
@@ -40,3 +41,4 @@
 * [OpenAI HER Baseline](https://github.com/openai/baselines/tree/master/baselines/her)
 * [hindsight-experience-replay by TianhongDai](https://github.com/TianhongDai/hindsight-experience-replay)
 * [rlkit](https://github.com/vitchyr/rlkit)
+* [pybullet multigoal gym](https://github.com/IanYangChina/pybullet_multigoal_gym)

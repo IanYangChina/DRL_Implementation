@@ -43,10 +43,10 @@ class HindsightSACAgent(object):
 
         self.critic_1 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
         self.critic_target_1 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
-        self.critic_optimizer_1 = Adam(self.critic.parameters(), lr=learning_rate)
+        self.critic_optimizer_1 = Adam(self.critic_1.parameters(), lr=learning_rate)
         self.critic_2 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
         self.critic_target_2 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
-        self.critic_optimizer_2 = Adam(self.critic.parameters(), lr=learning_rate)
+        self.critic_optimizer_2 = Adam(self.critic_2.parameters(), lr=learning_rate)
         self.tau = tau
         self.critic_target_soft_update(tau=1)
 
@@ -54,7 +54,7 @@ class HindsightSACAgent(object):
         self.actor_and_target_update_delay_steps = update_delay_steps
 
         self.alpha = alpha
-        self.target_entropy = -T.prod(T.Tensor(self.action_dim, dtype=T.float).to(self.device)).item()
+        self.target_entropy = -T.prod(T.tensor(self.action_dim, dtype=T.float).to(self.device)).item()
         self.log_alpha = T.zeros(1, requires_grad=True, device=self.device)
         self.alpha_optimizer = Adam([self.log_alpha], lr=alpha_learning_rate)
 
