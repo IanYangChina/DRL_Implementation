@@ -27,7 +27,7 @@ When testing, make sure comment out the mean update(line54), hindsight(line62), 
 # agent.load_network(50)
 success_rates = []
 cycle_returns = []
-EPOCH = 200 + 1
+EPOCH = 50 + 1
 CYCLE = 50
 EPISODE = 16
 
