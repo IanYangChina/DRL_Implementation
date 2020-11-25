@@ -1,3 +1,7 @@
 
 # Default ignored files
 /.idea
+Atari/__pycache__/
+__pycache__/
+agent/__pycache__/
+agent/utils/__pycache__/
