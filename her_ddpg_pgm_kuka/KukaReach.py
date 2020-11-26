@@ -11,7 +11,7 @@ T = namedtuple("transition",
 env = pgm.make("KukaReachSparseEnv-v0")
 env.seed(0)
 obs = env.reset()
-env_params = {'obs_dims': obs['observation'].shape[0],
+env_params = {'obs_dims': obs['state'].shape[0],
               'goal_dims': obs['desired_goal'].shape[0],
               'action_dims': env.action_space.shape[0],
               'action_max': env.action_space.high,
