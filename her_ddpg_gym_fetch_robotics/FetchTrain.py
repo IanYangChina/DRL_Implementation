@@ -37,6 +37,7 @@ for epo in range(EPOCH):
         ep = 0
         cycle_return = 0
         cycle_timesteps = 0
+        cycle_successes = 0
         while ep < EPISODE:
             done = False
             new_episode = True
@@ -54,10 +55,12 @@ for epo in range(EPOCH):
                                new_obs['observation'], new_obs['achieved_goal'], reward, 1-int(done))
                 new_episode = False
                 obs = new_obs
+            if ep_return > -50:
+                cycle_successes += 1
             agent.normalizer.update_mean()
             ep += 1
             cycle_return += ep_return
-        success_rate = 100*(cycle_return+EPISODE*50)/cycle_timesteps
+        success_rate = cycle_successes / EPISODE
         success_rates.append(success_rate)
         cycle_returns.append(cycle_return)
         print("Epoch %i" % epo, "cycle %i" % cyc,
