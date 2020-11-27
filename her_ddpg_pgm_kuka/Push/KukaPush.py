@@ -3,7 +3,7 @@ import numpy as np
 import pybullet_multigoal_gym as pgm
 from plot import smoothed_plot
 from collections import namedtuple
-from agent.sac_her_continuous import HindsightSACAgent
+from agent.ddpg_her_continuous import HindsightDDPGAgent
 path = os.path.dirname(os.path.realpath(__file__))
 data_path = path + '/data'
 if not os.path.isdir(data_path):
@@ -11,7 +11,7 @@ if not os.path.isdir(data_path):
 
 T = namedtuple("transition",
                ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
-env = pgm.make("KukaReachSparseEnv-v0")
+env = pgm.make("KukaPushSparseEnv-v0")
 env.seed(0)
 obs = env.reset()
 env_params = {'obs_dims': obs['state'].shape[0],
@@ -21,7 +21,7 @@ env_params = {'obs_dims': obs['state'].shape[0],
               'init_input_means': np.zeros((obs['state'].shape[0]+obs['desired_goal'].shape[0],)),
               'init_input_var': np.ones((obs['state'].shape[0]+obs['desired_goal'].shape[0],))
               }
-agent = HindsightSACAgent(env_params, T, path=path, seed=300, hindsight=True)
+agent = HindsightDDPGAgent(env_params, T, path=path, seed=300, hindsight=True)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
@@ -52,7 +52,7 @@ for epo in range(EPOCH):
             # start a new episode
             while not done:
                 cycle_timesteps += 1
-                action = agent.select_action(obs['state'], obs['desired_goal'])
+                action = agent.act(obs['state'], obs['desired_goal'], test=TEST)
                 new_obs, reward, done, info = env.step(action)
                 ep_return += reward
                 agent.remember(new_episode,

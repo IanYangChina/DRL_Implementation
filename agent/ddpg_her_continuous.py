@@ -54,7 +54,6 @@ class HindsightDDPGAgent(object):
 
     def act(self, state, desired_goal, test=False):
         inputs = np.concatenate((state, desired_goal), axis=0)
-        self.normalizer.store_history(inputs)
         inputs = self.normalizer(inputs)
         chance = R.uniform(0, 1)
         if (not test) and (chance < self.random_action_chance):

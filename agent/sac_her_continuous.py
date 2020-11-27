@@ -11,8 +11,8 @@ from agent.utils.replay_buffer import HindsightReplayBuffer
 
 class HindsightSACAgent(object):
     def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True,
-                 memory_capacity=int(1e6), optimization_steps=25, tau=0.1, batch_size=64,
-                 discount_factor=0.98, learning_rate=0.001, alpha=0.2, alpha_learning_rate=0.001, update_delay_steps=1):
+                 memory_capacity=int(1e6), optimization_steps=40, tau=0.05, batch_size=64,
+                 discount_factor=0.98, learning_rate=0.001, alpha=0.2, alpha_learning_rate=0.001, update_delay_steps=2):
         T.manual_seed(seed)
         R.seed(seed)
         if path is None:

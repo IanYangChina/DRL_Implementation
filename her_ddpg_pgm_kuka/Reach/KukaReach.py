@@ -5,6 +5,9 @@ from plot import smoothed_plot
 from collections import namedtuple
 from agent.ddpg_her_continuous import HindsightDDPGAgent
 path = os.path.dirname(os.path.realpath(__file__))
+data_path = path + '/data'
+if not os.path.isdir(data_path):
+    os.mkdir(data_path)
 
 T = namedtuple("transition",
                ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
@@ -22,8 +25,13 @@ agent = HindsightDDPGAgent(env_params, T, path=path, seed=300, hindsight=True)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
+TEST = False
 # Load target networks at epoch 50
-# agent.load_network(50)
+if TEST:
+    agent.load_network(200)
+    agent.normalizer.history_mean = np.load(data_path + "/input_means.npy")
+    agent.normalizer.history_var = np.load(data_path + "/input_vars.npy")
+
 success_rates = []
 cycle_returns = []
 EPOCH = 200 + 1
@@ -44,8 +52,7 @@ for epo in range(EPOCH):
             # start a new episode
             while not done:
                 cycle_timesteps += 1
-                env.render(mode="human")
-                action = agent.act(obs['state'], obs['desired_goal'], test=True)
+                action = agent.act(obs['state'], obs['desired_goal'], test=TEST)
                 new_obs, reward, done, info = env.step(action)
                 ep_return += reward
                 agent.remember(new_episode,
@@ -68,5 +75,7 @@ for epo in range(EPOCH):
     if (epo % 50 == 0) and (epo != 0):
         agent.save_networks(epo)
 
-smoothed_plot("success_rates.png", success_rates, x_label="Cycle")
-smoothed_plot("cycle_returns.png", cycle_returns, x_label="Cycle")
+np.save(data_path + "/input_means", agent.normalizer.history_mean)
+np.save(data_path + "/input_vars", agent.normalizer.history_var)
+smoothed_plot(data_path+"/success_rates.png", success_rates, x_label="Cycle")
+smoothed_plot(data_path+"/cycle_returns.png", cycle_returns, x_label="Cycle")
