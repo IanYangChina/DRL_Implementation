@@ -23,11 +23,13 @@ env_params = {'obs_dims': obs['state'].shape[0],
               }
 agent = HindsightDDPGAgent(env_params, T, path=path, seed=300, hindsight=True)
 """
-When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
+When testing, make sure comment out the remember, mean update, and learning function calls
 """
 TEST = False
 # Load target networks at epoch 50
 if TEST:
+    # prolong the episode length to see clearer what the agent has learnt (default is 50)
+    # env._max_episode_steps = 200
     agent.load_network(200)
     agent.normalizer.history_mean = np.load(data_path + "/input_means.npy")
     agent.normalizer.history_var = np.load(data_path + "/input_vars.npy")
