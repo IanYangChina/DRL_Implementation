@@ -6,15 +6,16 @@ import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.utils.normalizer import Normalizer
 from agent.utils.networks import StochasticActor, Critic
-from agent.utils.replay_buffer import HindsightReplayBuffer
+from agent.utils.replay_buffer import *
 
 
 class HindsightSACAgent(object):
-    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True,
+    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True, prioritised=True,
                  memory_capacity=int(1e6), optimization_steps=40, tau=0.05, batch_size=64,
-                 discount_factor=0.98, learning_rate=0.001, alpha=0.2, alpha_learning_rate=0.001, update_delay_steps=2):
+                 discount_factor=0.98, learning_rate=0.001, alpha=0.2, update_delay_steps=2):
         T.manual_seed(seed)
         R.seed(seed)
+        self.rng = np.random.default_rng(seed=seed)
         if path is None:
             self.ckpt_path = "ckpts"
         else:
@@ -32,13 +33,17 @@ class HindsightSACAgent(object):
         self.normalizer = Normalizer(self.state_dim+self.goal_dim,
                                      env_params['init_input_means'], env_params['init_input_var'])
         self.hindsight = hindsight
-        self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
+        self.prioritised = prioritised
+        if not self.prioritised:
+            self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
+        else:
+            self.buffer = PrioritisedHindsightReplayBuffer(memory_capacity, transition_namedtuple, level='low', rng=self.rng)
         self.batch_size = batch_size
         self.optimization_steps = optimization_steps
         self.gamma = discount_factor
 
         self.actor = StochasticActor(self.state_dim+self.goal_dim, self.action_dim,
-                                     log_std_min=-20, log_std_max=2).to(self.device)
+                                     log_std_min=-6, log_std_max=1).to(self.device)
         self.actor_optimizer = Adam(self.actor.parameters(), lr=learning_rate)
 
         self.critic_1 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
@@ -50,13 +55,13 @@ class HindsightSACAgent(object):
         self.tau = tau
         self.critic_target_soft_update(tau=1)
 
-        self.actor_and_target_update_delay_count = 0
-        self.actor_and_target_update_delay_steps = update_delay_steps
+        # self.actor_and_target_update_delay_count = 0
+        # self.actor_and_target_update_delay_steps = update_delay_steps
 
-        self.alpha = alpha
-        self.target_entropy = -T.prod(T.tensor(self.action_dim, dtype=T.float).to(self.device)).item()
+        self.alpha = T.tensor(alpha, dtype=T.float32, device=self.device)
+        self.target_entropy = -self.action_dim
         self.log_alpha = T.zeros(1, requires_grad=True, device=self.device)
-        self.alpha_optimizer = Adam([self.log_alpha], lr=alpha_learning_rate)
+        self.alpha_optimizer = Adam([self.log_alpha], lr=learning_rate)
 
     def select_action(self, state, desired_goal):
         inputs = np.concatenate((state, desired_goal), axis=0)
@@ -80,66 +85,66 @@ class HindsightSACAgent(object):
             steps = self.optimization_steps
 
         for i in range(steps):
-            batch = self.buffer.sample(batch_size)
+            if self.prioritised:
+                batch, weights, inds = self.buffer.sample(batch_size)
+                weights = T.tensor(weights).view(batch_size, 1).to(self.device)
+            else:
+                batch = self.buffer.sample(batch_size)
+                weights = T.ones(size=(batch_size, 1)).to(self.device)
+                inds = None
+
             actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
             actor_inputs = self.normalizer(actor_inputs)
             actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
             actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
+            critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
             actor_inputs_ = np.concatenate((batch.next_state, batch.desired_goal), axis=1)
             actor_inputs_ = self.normalizer(actor_inputs_)
             actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
 
-            self.critic_target_1.eval()
-            self.critic_target_2.eval()
-            self.actor.eval()
-            self.critic_1.train()
-            self.critic_2.train()
-            actions_, log_probs_ = self.actor.get_action(actor_inputs_, probs=True)
+            # calculate next state-action value
+            with T.no_grad():
+                actions_, log_probs_ = self.actor.get_action(actor_inputs_, probs=True)
+                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
+                value_1_ = self.critic_target_1(critic_inputs_)
+                value_2_ = self.critic_target_2(critic_inputs_)
 
-            critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
-            value_estimate_1 = self.critic_1(critic_inputs)
-            value_estimate_2 = self.critic_2(critic_inputs)
-            critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
-            value_1_ = self.critic_target_1(critic_inputs_)
-            value_2_ = self.critic_target_2(critic_inputs_)
             value_ = T.min(value_1_, value_2_) - (self.alpha*log_probs_)
             value_target = rewards + done*self.gamma*value_
-            critic_loss_1 = F.mse_loss(value_estimate_1, value_target.detach())
+
+            value_estimate_1 = self.critic_1(critic_inputs)
+            critic_loss_1 = F.mse_loss(value_estimate_1, value_target.detach(), reduction='none')
             self.critic_optimizer_1.zero_grad()
-            critic_loss_1.backward()
+            (critic_loss_1 * weights).mean().backward()
+            if self.prioritised:
+                assert inds is not None
+                self.buffer.update_priority(inds, np.abs(critic_loss_1.cpu().detach().numpy()))
             self.critic_optimizer_1.step()
 
-            critic_loss_2 = F.mse_loss(value_estimate_2, value_target.detach())
+            value_estimate_2 = self.critic_2(critic_inputs)
+            critic_loss_2 = F.mse_loss(value_estimate_2, value_target.detach(), reduction='none')
             self.critic_optimizer_2.zero_grad()
-            critic_loss_2.backward()
+            (critic_loss_2 * weights).mean().backward()
             self.critic_optimizer_2.step()
 
-            self.critic_1.eval()
-            self.critic_2.eval()
-            self.actor.train()
+            self.actor_optimizer.zero_grad()
             new_actions, new_log_probs = self.actor.get_action(actor_inputs, probs=True)
+            critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
+            new_values = T.min(self.critic_1(critic_eval_inputs), self.critic_2(critic_eval_inputs))
+            actor_loss = self.alpha*new_log_probs - new_values
+            actor_loss = actor_loss.mean()
+            actor_loss.backward()
+            self.actor_optimizer.step()
 
-            self.actor_and_target_update_delay_count = \
-                (self.actor_and_target_update_delay_count+1) % self.actor_and_target_update_delay_steps
-            if self.actor_and_target_update_delay_count == (self.actor_and_target_update_delay_steps-1):
-                self.critic_target_soft_update()
-
-                critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
-                new_values = T.min(self.critic_1(critic_eval_inputs), self.critic_2(critic_eval_inputs))
-                actor_loss = self.alpha*new_log_probs - new_values
-                actor_loss = actor_loss.mean()
-                self.actor_optimizer.zero_grad()
-                actor_loss.backward()
-                self.actor_optimizer.step()
-                self.actor.eval()
-
-            alpha_loss = (self.log_alpha * (-new_log_probs - self.target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
+            alpha_loss = (self.log_alpha * (-new_log_probs - self.target_entropy).detach()).mean()
             alpha_loss.backward()
             self.alpha_optimizer.step()
             self.alpha = self.log_alpha.exp()
+
+            self.critic_target_soft_update()
 
     def critic_target_soft_update(self, tau=None):
         if tau is None:

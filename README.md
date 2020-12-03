@@ -10,7 +10,7 @@
 - [X] DQN - Hindsight, Deterministic, Discrete
 - [X] DDPG - Hindsight, Deterministic, Continuous
 - [X] TD3 - Hindsight, Deterministic, Discrete
-- [X] SAC - Hindsight, (Adaptive Temperature) - Stochastic, Continuous
+- [X] SAC (Adaptive Temperature) - Hindsight, Prioritised - Stochastic, Continuous
 
 #### Algorithms: Hierarchical
 - [X] Option DQN - Hindsight, Deterministic, Discrete
