@@ -51,7 +51,7 @@ class StochasticActor(nn.Module):
         mean, log_std = self(inputs)
         std = log_std.exp()
         mu = Normal(mean, std)
-        z = mu.sample()
+        z = mu.rsample()
         action = T.tanh(z)
         if not probs:
             return action
