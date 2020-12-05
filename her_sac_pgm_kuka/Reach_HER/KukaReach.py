@@ -3,7 +3,7 @@ import numpy as np
 import pybullet_multigoal_gym as pgm
 from plot import smoothed_plot
 from collections import namedtuple
-from agent.ddpg_her_continuous import HindsightDDPGAgent
+from agent.sac_her_continuous import HindsightSACAgent
 path = os.path.dirname(os.path.realpath(__file__))
 data_path = path + '/data'
 if not os.path.isdir(data_path):
@@ -21,15 +21,13 @@ env_params = {'obs_dims': obs['state'].shape[0],
               'init_input_means': np.zeros((obs['state'].shape[0]+obs['desired_goal'].shape[0],)),
               'init_input_var': np.ones((obs['state'].shape[0]+obs['desired_goal'].shape[0],))
               }
-agent = HindsightDDPGAgent(env_params, T, path=path, seed=300, hindsight=True)
+agent = HindsightSACAgent(env_params, T, path=path, seed=300, hindsight=True, prioritised=False)
 """
-When testing, make sure comment out the remember, mean update, and learning function calls
+When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
 TEST = False
 # Load target networks at epoch 50
 if TEST:
-    # prolong the episode length to see clearer what the agent has learnt (default is 50)
-    # env._max_episode_steps = 200
     agent.load_network(200)
     agent.normalizer.history_mean = np.load(data_path + "/input_means.npy")
     agent.normalizer.history_var = np.load(data_path + "/input_vars.npy")
@@ -54,12 +52,14 @@ for epo in range(EPOCH):
             # start a new episode
             while not done:
                 cycle_timesteps += 1
-                action = agent.act(obs['state'], obs['desired_goal'], test=TEST)
+                action = agent.select_action(obs['state'], obs['desired_goal'])
                 new_obs, reward, done, info = env.step(action)
                 ep_return += reward
                 agent.remember(new_episode,
                                obs['state'], obs['desired_goal'], action,
                                new_obs['state'], new_obs['achieved_goal'], reward, 1-int(done))
+                agent.normalizer.store_history(np.concatenate((new_obs['state'],
+                                                               new_obs['desired_goal']), axis=0))
                 new_episode = False
                 obs = new_obs
             if ep_return > -50:

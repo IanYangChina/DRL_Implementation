@@ -1,5 +1,5 @@
 import random as R
-from numpy import array_equal
+import numpy as np
 from .segment_tree import SumSegmentTree, MinSegmentTree
 
 
@@ -113,7 +113,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                     break
                 ind = R.randint(0, len(ep)-1)
                 goal = ep[ind].achieved_goal
-                if all(not array_equal(goal, g) for g in goals[1]):
+                if all(not np.array_equal(goal, g) for g in goals[1]):
                     goals[0].append(ind)
                     goals[1].append(goal)
                     done = True
@@ -163,7 +163,7 @@ class GridWorldHindsightReplayBuffer(EpisodeWiseReplayBuffer):
                     break
                 ind = R.randint(0, len(ep)-1)
                 goal = ep[ind].achieved_goal
-                if all(not array_equal(goal, g) for g in goals[1]):
+                if all(not np.array_equal(goal, g) for g in goals[1]):
                     goals[0].append(ind)
                     goals[1].append(goal)
                     done = True
@@ -201,7 +201,7 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
             self.ep_position += 1
         self.episodes[self.ep_position].append(self.Transition(*args))
 
-    def store_episode(self):
+    def store_episodes(self):
         if len(self.episodes) == 0:
             return
         for ep in self.episodes:
@@ -272,7 +272,7 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
         assert self.goal_type in ['state', 'image']
         PrioritisedEpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, alpha=alpha, beta=beta, rng=rng)
 
-    def modify_experiences(self):
+    def modify_episodes(self):
         if len(self.episodes) == 0:
             return
         if self.lv == 'low':
@@ -355,3 +355,9 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                     goals[0].append(ind)
                     done = True
         return goals
+
+
+def goal_distance_reward(goal_a, goal_b):
+    assert goal_a.shape == goal_b.shape
+    d = np.linalg.norm(goal_a - goal_b, axis=-1)
+    return -(d > 0.02).astype(np.float32)

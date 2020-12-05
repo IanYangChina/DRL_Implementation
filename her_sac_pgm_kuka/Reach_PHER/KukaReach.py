@@ -21,7 +21,7 @@ env_params = {'obs_dims': obs['state'].shape[0],
               'init_input_means': np.zeros((obs['state'].shape[0]+obs['desired_goal'].shape[0],)),
               'init_input_var': np.ones((obs['state'].shape[0]+obs['desired_goal'].shape[0],))
               }
-agent = HindsightSACAgent(env_params, T, path=path, seed=300, hindsight=True)
+agent = HindsightSACAgent(env_params, T, path=path, seed=300, hindsight=True, prioritised=True)
 """
 When testing, make sure comment out the mean update(line54), hindsight(line62), and learning(line63)
 """
