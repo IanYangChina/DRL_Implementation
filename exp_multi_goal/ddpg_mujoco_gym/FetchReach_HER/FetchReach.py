@@ -18,4 +18,4 @@ for seed in seeds:
                       seed=seed,
                       path=path)
 
-    trainer.run(test=False, n_epochs=200, load_network_ep=150)
+    trainer.run(test=False, load_network_ep=150)
