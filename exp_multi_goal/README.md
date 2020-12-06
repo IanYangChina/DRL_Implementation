@@ -34,17 +34,7 @@ add normal noise into increments along each axes with standard deviation equal t
 
 * The goal-conditioned sac agent doesn't need value clipping.
 * Prioritised replay supported.
-
+    
 #### Results on the task 'Reach'
-<figure>
-    <img src="sac_pybullet_gym/Reach_HER/seed11/data/cycle_returns.png" width="250"/>
-    <img src="sac_pybullet_gym/Reach_PHER/seed11/data/cycle_returns.png" width="250"/>
-    <figcaption>From left to right: SAC_HER, SAC_PHER</figcaption>
-</figure>
-
-![SAC_HER](sac_pybullet_gym/Reach_HER/seed11/data/cycle_returns.png#thumbnail)
-
-img[src*="#thumbnail"] {
-   width:150px;
-   height:100px;
-}
+<img src="sac_pybullet_gym/Reach_HER/seed11/data/cycle_returns.png" width="250"/>
+<img src="sac_pybullet_gym/Reach_PHER/seed11/data/cycle_returns.png" width="250"/>
