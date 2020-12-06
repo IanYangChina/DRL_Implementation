@@ -38,10 +38,6 @@ add normal noise into increments along each axes with standard deviation equal t
 #### Results on the task 'Reach'
 <figure>
     <img src="sac_pybullet_gym/Reach_HER/seed11/data/cycle_returns.png" width="250"/>
-    <figcaption>SAC_HER</figcaption>
-</figure>
-
-<figure>
     <img src="sac_pybullet_gym/Reach_PHER/seed11/data/cycle_returns.png" width="250"/>
-    <figcaption>SAC_PHER</figcaption>
+    <figcaption>From left to right: SAC_HER, SAC_PHER</figcaption>
 </figure>
