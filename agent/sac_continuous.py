@@ -7,8 +7,8 @@ from agent.utils.networks import StochasticActor, Critic
 from agent.utils.replay_buffer import *
 
 
-class HindsightSACAgent(object):
-    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True, prioritised=True,
+class SACAgent(object):
+    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, prioritised=True,
                  memory_capacity=int(1e6), optimization_steps=40, tau=0.005, batch_size=256,
                  discount_factor=0.98, learning_rate=0.001, alpha=0.2):
         T.manual_seed(seed)
@@ -24,31 +24,30 @@ class HindsightSACAgent(object):
         self.device = T.device("cuda" if use_cuda else "cpu")
 
         self.state_dim = env_params['obs_dims']
-        self.goal_dim = env_params['goal_dims']
         self.action_dim = env_params['action_dims']
         self.action_max = env_params['action_max']
 
-        self.normalizer = Normalizer(self.state_dim+self.goal_dim,
+        self.normalizer = Normalizer(self.state_dim,
                                      env_params['init_input_means'], env_params['init_input_var'])
-        self.hindsight = hindsight
+
         self.prioritised = prioritised
         if not self.prioritised:
-            self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
+            self.buffer = ReplayBuffer(memory_capacity, transition_namedtuple, seed=seed)
         else:
-            self.buffer = PrioritisedHindsightReplayBuffer(memory_capacity, transition_namedtuple, level='low', rng=self.rng)
+            self.buffer = PrioritisedReplayBuffer(memory_capacity, transition_namedtuple, rng=self.rng)
         self.batch_size = batch_size
         self.optimization_steps = optimization_steps
         self.gamma = discount_factor
 
-        self.actor = StochasticActor(self.state_dim+self.goal_dim, self.action_dim,
+        self.actor = StochasticActor(self.state_dim, self.action_dim,
                                      log_std_min=-6, log_std_max=1).to(self.device)
         self.actor_optimizer = Adam(self.actor.parameters(), lr=learning_rate)
 
-        self.critic_1 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
-        self.critic_target_1 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
+        self.critic_1 = Critic(self.state_dim+self.action_dim, 1).to(self.device)
+        self.critic_target_1 = Critic(self.state_dim+self.action_dim, 1).to(self.device)
         self.critic_optimizer_1 = Adam(self.critic_1.parameters(), lr=learning_rate)
-        self.critic_2 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
-        self.critic_target_2 = Critic(self.state_dim+self.goal_dim+self.action_dim, 1).to(self.device)
+        self.critic_2 = Critic(self.state_dim+self.action_dim, 1).to(self.device)
+        self.critic_target_2 = Critic(self.state_dim+self.action_dim, 1).to(self.device)
         self.critic_optimizer_2 = Adam(self.critic_2.parameters(), lr=learning_rate)
         self.tau = tau
         self.critic_target_soft_update(tau=1)
@@ -58,20 +57,16 @@ class HindsightSACAgent(object):
         self.log_alpha = T.zeros(1, requires_grad=True, device=self.device)
         self.alpha_optimizer = Adam([self.log_alpha], lr=learning_rate)
 
-    def select_action(self, state, desired_goal):
-        inputs = np.concatenate((state, desired_goal), axis=0)
-        inputs = self.normalizer(inputs)
+    def select_action(self, state):
+        inputs = self.normalizer(state)
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         self.actor.eval()
         return self.actor.get_action(inputs).detach().cpu().numpy()
 
-    def remember(self, new_episode, *args):
-        self.buffer.store_experience(new_episode, *args)
+    def remember(self, *args):
+        self.buffer.store_experience(*args)
 
     def learn(self, steps=None, batch_size=None):
-        if self.hindsight:
-            self.buffer.modify_episodes()
-        self.buffer.store_episodes()
         if batch_size is None:
             batch_size = self.batch_size
         if len(self.buffer) < batch_size:
@@ -88,13 +83,11 @@ class HindsightSACAgent(object):
                 weights = T.ones(size=(batch_size, 1)).to(self.device)
                 inds = None
 
-            actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
-            actor_inputs = self.normalizer(actor_inputs)
+            actor_inputs = self.normalizer(batch.state)
             actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
             actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
             critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
-            actor_inputs_ = np.concatenate((batch.next_state, batch.desired_goal), axis=1)
-            actor_inputs_ = self.normalizer(actor_inputs_)
+            actor_inputs_ = self.normalizer(batch.next_state)
             actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)

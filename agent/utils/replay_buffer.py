@@ -62,17 +62,6 @@ class EpisodeWiseReplayBuffer(object):
         return len(self.memory)
 
 
-"""
-Below are two replay buffers with hindsight goal relabeling support.
-    The first one is for general usage with transition tuple: 
-        ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done').
-    The second one is for the GridWorld environment designed in this repo ./envs/grid_world, with tuple:
-        ('state', 'inventory', 'desired_goal', 'action', 
-        'next_state', 'next_inventory', 'next_goal', 'achieved_goal', 
-        'reward', 'done')
-"""
-
-
 class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, sampled_goal_num=6, seed=0):
         self.k = sampled_goal_num
@@ -168,6 +157,79 @@ class GridWorldHindsightReplayBuffer(EpisodeWiseReplayBuffer):
                     goals[1].append(goal)
                     done = True
         return goals
+
+
+class PrioritisedReplayBuffer(object):
+    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, epsilon=1e-6, rng=None):
+        if rng is None:
+            self.rng = np.random.default_rng(seed=0)
+        else:
+            self.rng = rng
+        self.capacity = capacity
+        self.memory = []
+        self.mem_position = 0
+        self.Transition = tr_namedtuple
+        self.alpha = alpha
+        self.beta = beta
+        self.epsilon = epsilon
+        tree_capacity = 1
+        while tree_capacity < capacity:
+            tree_capacity *= 2
+        self.sum_tree = SumSegmentTree(tree_capacity)
+        self.min_tree = MinSegmentTree(tree_capacity)
+        self._max_priority = 1.0
+
+    def store_experience(self, *args):
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.mem_position] = self.Transition(*args)
+        self.sum_tree[self.mem_position] = self._max_priority ** self.alpha
+        self.min_tree[self.mem_position] = self._max_priority ** self.alpha
+        self.mem_position = (self.mem_position + 1) % self.capacity
+
+    def sample(self, batch_size, beta=None):
+        if beta is None:
+            beta = self.beta
+        assert beta > 0, "beta should be greater than 0"
+        inds, priority_sum = self.sample_proportion(batch_size)
+        batch = []
+        weights = []
+        minimal_priority = self.min_tree.min()
+        max_weight = (minimal_priority / priority_sum * len(self)) ** (-beta)
+        for ind in inds:
+            batch.append(self.memory[ind])
+            sample_priority = self.sum_tree[ind] / priority_sum
+            weight = (sample_priority * len(self)) ** (-beta)
+            weight = weight / max_weight
+            weights.append(weight)
+
+        return self.Transition(*zip(*batch)), np.array(weights), inds
+
+    def sample_proportion(self, batch_size):
+        inds = []
+        priority_sum = self.sum_tree.sum(0, len(self) - 1)
+        interval = priority_sum / batch_size
+        for i in range(batch_size):
+            mass = self.rng.uniform() * interval + i * interval
+            ind = self.sum_tree.find_prefixsum_idx(mass)
+            try:
+                k = self.memory[ind]
+            except IndexError as e:
+                print(e, ind, len(self))
+
+            inds.append(ind)
+        return inds, priority_sum
+
+    def update_priority(self, inds, priorities):
+        for ind, priority in zip(inds, priorities):
+            assert priority >= 0
+            assert 0 <= ind < len(self)
+            self.sum_tree[ind] = (priority + self.epsilon) ** self.alpha
+            self.min_tree[ind] = (priority + self.epsilon) ** self.alpha
+            self._max_priority = max(self._max_priority, priority)
+
+    def __len__(self):
+        return len(self.memory)
 
 
 class PrioritisedEpisodeWiseReplayBuffer(object):
