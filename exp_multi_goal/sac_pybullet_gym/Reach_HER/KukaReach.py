@@ -10,7 +10,7 @@ for seed in seeds:
     if not os.path.isdir(path):
         os.mkdir(path)
 
-    trainer = Trainer(env="KukaReachRenderSparseEnv-v0",
+    trainer = Trainer(env="KukaReachSparseEnv-v0",
                       agent=HindsightSACAgent,
                       hindsight=True,
                       prioritised=False,

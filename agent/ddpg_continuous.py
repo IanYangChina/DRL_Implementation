@@ -10,7 +10,7 @@ from agent.utils.replay_buffer import *
 class DDPGAgent(object):
     def __init__(self, env_params, transition_namedtuple, path=None, seed=0, prioritised=True,
                  noise_deviation_rate=0.05, random_action_chance=0.2,
-                 memory_capacity=int(1e6), optimization_steps=40, tau=0.05, batch_size=128,
+                 memory_capacity=int(1e6), optimization_steps=40, tau=0.005, batch_size=128,
                  discount_factor=0.98, learning_rate=0.001):
         T.manual_seed(seed)
         R.seed(seed)
