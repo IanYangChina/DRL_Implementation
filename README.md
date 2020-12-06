@@ -8,7 +8,7 @@
 
 #### Algorithms: Flat
 - [X] DQN - Hindsight, Deterministic, Discrete
-- [X] DDPG - Hindsight, Deterministic, Continuous
+- [X] DDPG - Hindsight, Prioritised, Deterministic, Continuous
 - [X] TD3 - Hindsight, Deterministic, Discrete
 - [X] SAC (Adaptive Temperature) - Hindsight, Prioritised - Stochastic, Continuous
 

@@ -57,10 +57,9 @@ class SACAgent(object):
         self.log_alpha = T.zeros(1, requires_grad=True, device=self.device)
         self.alpha_optimizer = Adam([self.log_alpha], lr=learning_rate)
 
-    def select_action(self, state):
+    def select_action(self, state, *args):
         inputs = self.normalizer(state)
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
-        self.actor.eval()
         return self.actor.get_action(inputs).detach().cpu().numpy()
 
     def remember(self, *args):
@@ -156,6 +155,6 @@ class SACAgent(object):
     def load_network(self, epoch):
         self.actor.load_state_dict(T.load(self.ckpt_path+'/ckpt_actor_epoch'+str(epoch)+'.pt'))
         self.critic_1.load_state_dict(T.load(self.ckpt_path + '/ckpt_critic_1_epoch' + str(epoch) + '.pt'))
-        self.critic_target_1.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_target_1_epoch'+str(epoch)+'.pt'))
+        self.critic_target_1.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_1_target_epoch'+str(epoch)+'.pt'))
         self.critic_2.load_state_dict(T.load(self.ckpt_path + '/ckpt_critic_2_epoch' + str(epoch) + '.pt'))
-        self.critic_target_2.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_target_2_epoch'+str(epoch)+'.pt'))
+        self.critic_target_2.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_2_target_epoch'+str(epoch)+'.pt'))

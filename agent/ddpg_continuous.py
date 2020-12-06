@@ -1,6 +1,4 @@
 import os
-import random as R
-import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
@@ -55,17 +53,17 @@ class DDPGAgent(object):
         self.tau = tau
         self.soft_update(tau=1)
 
-    def act(self, state, test=False):
+    def select_action(self, state, test=False):
         inputs = self.normalizer(state)
         chance = R.uniform(0, 1)
         if (not test) and (chance < self.random_action_chance):
-            action = np.random.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
+            action = self.rng.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
             return action
         elif (not test) and (chance >= self.random_action_chance):
             self.actor_target.eval()
             inputs = T.tensor(inputs, dtype=T.float).to(self.device)
             action = self.actor_target(inputs).cpu().detach().numpy()
-            noise = self.noise_deviation*np.random.randn(self.action_dim)
+            noise = self.noise_deviation*self.rng.standard_normal(size=self.action_dim)
             action += noise
             action = np.clip(action, -self.action_max, self.action_max)
             return action

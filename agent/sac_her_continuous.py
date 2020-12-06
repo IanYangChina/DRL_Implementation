@@ -58,11 +58,10 @@ class HindsightSACAgent(object):
         self.log_alpha = T.zeros(1, requires_grad=True, device=self.device)
         self.alpha_optimizer = Adam([self.log_alpha], lr=learning_rate)
 
-    def select_action(self, state, desired_goal):
+    def select_action(self, state, desired_goal, *args):
         inputs = np.concatenate((state, desired_goal), axis=0)
         inputs = self.normalizer(inputs)
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
-        self.actor.eval()
         return self.actor.get_action(inputs).detach().cpu().numpy()
 
     def remember(self, new_episode, *args):
@@ -163,6 +162,6 @@ class HindsightSACAgent(object):
     def load_network(self, epoch):
         self.actor.load_state_dict(T.load(self.ckpt_path+'/ckpt_actor_epoch'+str(epoch)+'.pt'))
         self.critic_1.load_state_dict(T.load(self.ckpt_path + '/ckpt_critic_1_epoch' + str(epoch) + '.pt'))
-        self.critic_target_1.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_target_1_epoch'+str(epoch)+'.pt'))
+        self.critic_target_1.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_1_target_epoch'+str(epoch)+'.pt'))
         self.critic_2.load_state_dict(T.load(self.ckpt_path + '/ckpt_critic_2_epoch' + str(epoch) + '.pt'))
-        self.critic_target_2.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_target_2_epoch'+str(epoch)+'.pt'))
+        self.critic_target_2.load_state_dict(T.load(self.ckpt_path+'/ckpt_critic_2_target_epoch'+str(epoch)+'.pt'))

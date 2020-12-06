@@ -1,21 +1,20 @@
 import os
-import random as R
-import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.utils.normalizer import Normalizer
 from agent.utils.networks import Actor, Critic
-from agent.utils.replay_buffer import HindsightReplayBuffer
+from agent.utils.replay_buffer import *
 
 
 class HindsightDDPGAgent(object):
-    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True,
+    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True, prioritised=True,
                  noise_deviation_rate=0.05, random_action_chance=0.2,
                  memory_capacity=int(1e6), optimization_steps=40, tau=0.05, batch_size=128, clip_rate=0.98,
                  discount_factor=0.98, learning_rate=0.001):
         T.manual_seed(seed)
         R.seed(seed)
+        self.rng = np.random.default_rng(seed=seed)
         if path is None:
             self.ckpt_path = "ckpts"
         else:
@@ -44,26 +43,30 @@ class HindsightDDPGAgent(object):
         self.clip_rate = clip_rate
         self.clip_value = -1 / (1-self.clip_rate)
         self.hindsight = hindsight
-        self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
-        self.batch_size = batch_size
+        self.prioritised = prioritised
+        if not self.prioritised:
+            self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
+        else:
+            self.buffer = PrioritisedHindsightReplayBuffer(memory_capacity, transition_namedtuple, level='low', rng=self.rng)
 
+        self.batch_size = batch_size
         self.optimizer_steps = optimization_steps
         self.gamma = discount_factor
         self.tau = tau
         self.soft_update(tau=1)
 
-    def act(self, state, desired_goal, test=False):
+    def select_action(self, state, desired_goal, test=False):
         inputs = np.concatenate((state, desired_goal), axis=0)
         inputs = self.normalizer(inputs)
         chance = R.uniform(0, 1)
         if (not test) and (chance < self.random_action_chance):
-            action = np.random.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
+            action = self.rng.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
             return action
         elif (not test) and (chance >= self.random_action_chance):
             self.actor_target.eval()
             inputs = T.tensor(inputs, dtype=T.float).to(self.device)
             action = self.actor_target(inputs).cpu().detach().numpy()
-            noise = self.noise_deviation*np.random.randn(self.action_dim)
+            noise = self.noise_deviation*self.rng.standard_normal(size=self.action_dim)
             action += noise
             action = np.clip(action, -self.action_max, self.action_max)
             return action
@@ -89,7 +92,14 @@ class HindsightDDPGAgent(object):
             steps = self.optimizer_steps
 
         for i in range(steps):
-            batch = self.buffer.sample(batch_size)
+            if self.prioritised:
+                batch, weights, inds = self.buffer.sample(batch_size)
+                weights = T.tensor(weights).view(batch_size, 1).to(self.device)
+            else:
+                batch = self.buffer.sample(batch_size)
+                weights = T.ones(size=(batch_size, 1)).to(self.device)
+                inds = None
+
             actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
             actor_inputs = self.normalizer(actor_inputs)
             actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
@@ -112,9 +122,12 @@ class HindsightDDPGAgent(object):
             value_ = self.critic_target(critic_inputs_)
             value_target = rewards + done*self.gamma*value_
             value_target = T.clamp(value_target, self.clip_value, 0.0)
-            critic_loss = F.mse_loss(value_estimate, value_target)
-            critic_loss.backward()
+            critic_loss = F.mse_loss(value_estimate, value_target, reduction='none')
+            (critic_loss * weights).mean().backward()
             self.critic_optimizer.step()
+            if self.prioritised:
+                assert inds is not None
+                self.buffer.update_priority(inds, np.abs(critic_loss.cpu().detach().numpy()))
 
             self.critic.eval()
             self.actor.train()
