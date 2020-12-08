@@ -18,7 +18,6 @@
 
 #### Algorithms: Hierarchical
 - [X] Option DQN - Hindsight, Deterministic, Discrete
-- [ ] Option DDPG - Hindsight, Deterministic, Continuous
 - [X] Option Critic - Hindsight, Stochastic, Discrete & Continuous
 - [ ] HIRO - Hindsight, Deterministic, Continuous
 - [ ] HAC - Hindsight, Deterministic, Continuous
