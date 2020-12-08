@@ -7,16 +7,25 @@
 #### Current status: under development  
 
 #### Algorithms: Flat
-- [X] DQN - Hindsight, Deterministic, Discrete
-- [X] DDPG - Hindsight, Prioritised, Deterministic, Continuous
-- [X] TD3 - Hindsight, Deterministic, Discrete
-- [X] SAC (Adaptive Temperature) - Hindsight, Prioritised - Stochastic, Continuous
+- [X] DQN - Deterministic, Discrete
+- [X] DDPG - Deterministic, Continuous
+- [X] TD3 -Deterministic, Discrete
+- [X] SAC (Adaptive Temperature) - Stochastic, Continuous
+
+#### Algorithms: Distributed
+- [ ] D4PG - Deterministic, Continuous
+- [ ] R2D2 - Deterministic, Discrete
 
 #### Algorithms: Hierarchical
 - [X] Option DQN - Hindsight, Deterministic, Discrete
 - [ ] Option DDPG - Hindsight, Deterministic, Continuous
 - [X] Option Critic - Hindsight, Stochastic, Discrete & Continuous
 - [ ] HIRO - Hindsight, Deterministic, Continuous
+- [ ] HAC - Hindsight, Deterministic, Continuous
+
+#### Replay buffers:
+- [X] Hindsight
+- [X] Prioritised
 
 #### Environments
 - [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal, Customized)
@@ -33,8 +42,11 @@
 * [PER](https://arxiv.org/abs/1511.05952)
 * [HER](http://papers.nips.cc/paper/7090-hindsight-experience-replay)
 * [HIRO](http://papers.nips.cc/paper/7591-data-efficient-hierarchical-reinforcement-learning.pdf)
+* [HAC](https://arxiv.org/abs/1712.00948)
 * [OptionFramework](https://www.sciencedirect.com/science/article/pii/S0004370299000521)
 * [OptionCritic](https://www.aaai.org/ocs/index.php/AAAI/AAAI17/paper/viewPaper/14858)
+* [D4PG](https://arxiv.org/abs/1804.08617)
+* [R2D2](https://openreview.net/pdf?id=r1lyTjAqYX)
 
 #### Reference Repos
 * [RL-Adventure-DDPG by higgsfield](https://github.com/higgsfield/RL-Adventure-2/blob/master/5.ddpg.ipynb)
