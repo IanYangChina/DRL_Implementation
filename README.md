@@ -7,8 +7,9 @@
 #### Current status: under development  
 
 #### Algorithms: Flat
-- [X] DQN - Deterministic, Discrete
+- [ ] DQN - Deterministic, Discrete
 - [X] DDPG - Deterministic, Continuous
+- [ ] PPO - Stochastic, Continuous
 - [X] TD3 -Deterministic, Discrete
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
 
@@ -22,7 +23,7 @@
 - [ ] HIRO - Hindsight, Deterministic, Continuous
 - [ ] HAC - Hindsight, Deterministic, Continuous
 
-#### Replay buffers:
+#### Replay buffers
 - [X] Hindsight
 - [X] Prioritised
 
