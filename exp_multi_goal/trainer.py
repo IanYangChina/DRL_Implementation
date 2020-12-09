@@ -4,6 +4,7 @@ import numpy as np
 import pybullet_multigoal_gym as pgm
 from plot import smoothed_plot
 from collections import namedtuple
+
 T = namedtuple("transition",
                ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
 
@@ -11,6 +12,8 @@ T = namedtuple("transition",
 class Trainer(object):
     def __init__(self, env, agent, hindsight, prioritised,
                  seed, path, render=False):
+        if not os.path.isdir(path):
+            os.mkdir(path)
         self.data_path = path + '/data'
         if not os.path.isdir(self.data_path):
             os.mkdir(self.data_path)
@@ -18,19 +21,19 @@ class Trainer(object):
         self.env.seed(seed)
         # this argument only works for Mujoco envs, not for PyBullet envs
         self.render = render
-        if render:
+        if self.render:
             self.env.render()
         obs = self.env.reset()
         env_params = {'obs_dims': obs['state'].shape[0],
                       'goal_dims': obs['desired_goal'].shape[0],
                       'action_dims': self.env.action_space.shape[0],
                       'action_max': self.env.action_space.high,
-                      'init_input_means': np.zeros((obs['state'].shape[0]+obs['desired_goal'].shape[0],)),
-                      'init_input_var': np.ones((obs['state'].shape[0]+obs['desired_goal'].shape[0],))
+                      'init_input_means': np.zeros((obs['state'].shape[0] + obs['desired_goal'].shape[0],)),
+                      'init_input_var': np.ones((obs['state'].shape[0] + obs['desired_goal'].shape[0],))
                       }
         self.agent = agent(env_params, T, path=path, seed=seed, hindsight=hindsight, prioritised=prioritised)
 
-    def run(self, test=False, n_epochs=100, load_network_ep=None):
+    def run(self, test=False, n_epochs=50, load_network_ep=None):
 
         if test:
             assert load_network_ep is not None
@@ -65,10 +68,10 @@ class Trainer(object):
                         ep_return += reward
                         if not test:
                             self.agent.remember(new_episode,
-                                           obs['state'], obs['desired_goal'], action,
-                                           new_obs['state'], new_obs['achieved_goal'], reward, 1-int(done))
+                                                obs['state'], obs['desired_goal'], action,
+                                                new_obs['state'], new_obs['achieved_goal'], reward, 1 - int(done))
                             self.agent.normalizer.store_history(np.concatenate((new_obs['state'],
-                                                                           new_obs['desired_goal']), axis=0))
+                                                                                new_obs['desired_goal']), axis=0))
                         new_episode = False
                         obs = new_obs
                     if ep_return > -50:
@@ -91,5 +94,10 @@ class Trainer(object):
         if not test:
             np.save(self.data_path + "/input_means", self.agent.normalizer.history_mean)
             np.save(self.data_path + "/input_vars", self.agent.normalizer.history_var)
-            smoothed_plot(self.data_path+"/success_rates.png", success_rates, x_label="Cycle")
-            smoothed_plot(self.data_path+"/cycle_returns.png", cycle_returns, x_label="Cycle")
+            np.save(self.data_path + "/success_rates", success_rates)
+            np.save(self.data_path + "/cycle_returns", cycle_returns)
+            # smoothed_plot(self.data_path + "/success_rates.png", success_rates, x_label="Cycle")
+            # smoothed_plot(self.data_path + "/cycle_returns.png", cycle_returns, x_label="Cycle")
+            return cycle_returns, success_rates
+        else:
+            return print("Test finished")

@@ -12,6 +12,8 @@ T = namedtuple("transition",
 
 class Trainer(object):
     def __init__(self, env, agent, prioritised, seed, render, path):
+        if not os.path.isdir(path):
+            os.mkdir(path)
         self.data_path = path + '/data'
         if not os.path.isdir(self.data_path):
             os.mkdir(self.data_path)
@@ -28,7 +30,7 @@ class Trainer(object):
                       }
         self.agent = agent(env_params, T, path=path, seed=seed, prioritised=prioritised)
 
-    def run(self, test=False, n_episodes=100, load_network_ep=None):
+    def run(self, test=False, n_episodes=50, load_network_ep=None):
         if test:
             assert load_network_ep is not None
             self.agent.load_network(load_network_ep)
@@ -63,7 +65,10 @@ class Trainer(object):
                 self.agent.save_networks(ep)
 
         if not test:
-            smoothed_plot(self.data_path+"/episode_returns.png", ep_returns, x_label="Episode")
+            # smoothed_plot(self.data_path+"/episode_returns.png", ep_returns, x_label="Episode")
+            np.save(self.data_path + '/episode_returns', ep_returns)
             np.save(self.data_path + "/input_means", self.agent.normalizer.history_mean)
             np.save(self.data_path + "/input_vars", self.agent.normalizer.history_var)
-
+            return ep_returns
+        else:
+            return print("Test finished")
