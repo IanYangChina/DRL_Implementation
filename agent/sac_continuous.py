@@ -10,7 +10,7 @@ from agent.utils.replay_buffer import *
 class SACAgent(object):
     def __init__(self, env_params, transition_namedtuple, path=None, seed=0, prioritised=True,
                  memory_capacity=int(1e6), optimization_steps=40, tau=0.005, batch_size=128,
-                 discount_factor=0.98, learning_rate=0.001, alpha=0.2):
+                 discount_factor=0.98, learning_rate=0.001, alpha=0.2, discard_time_limit=False):
         T.manual_seed(seed)
         R.seed(seed)
         self.rng = np.random.default_rng(seed=seed)
@@ -38,6 +38,7 @@ class SACAgent(object):
         self.batch_size = batch_size
         self.optimization_steps = optimization_steps
         self.gamma = discount_factor
+        self.discard_time_limit = discard_time_limit
 
         self.actor = StochasticActor(self.state_dim, self.action_dim,
                                      log_std_min=-6, log_std_max=1).to(self.device)
@@ -90,6 +91,9 @@ class SACAgent(object):
             actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+
+            if self.discard_time_limit:
+                done = done * 0 + 1
 
             # calculate next state-action value
             with T.no_grad():

@@ -10,11 +10,11 @@ for seed in seeds:
 
     seed_path = path + '/seed'+str(seed)
     trainer = Trainer(env="HalfCheetahBulletEnv-v0",
-                      agent=SACAgent,
-                      prioritised=False,
                       seed=seed,
                       render=False,
-                      path=seed_path)
+                      path=seed_path,
+                      agent=SACAgent,
+                      prioritised=False)
 
     seed_return = trainer.run(test=False, load_network_ep=150)
     seed_returns.append(seed_return)

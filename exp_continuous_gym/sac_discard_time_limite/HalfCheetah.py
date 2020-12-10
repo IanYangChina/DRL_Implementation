@@ -14,11 +14,11 @@ for seed in seeds:
                       render=False,
                       path=seed_path,
                       agent=SACAgent,
-                      prioritised=True)
+                      prioritised=False, discard_time_limit=True)
 
     seed_return = trainer.run(test=False, load_network_ep=150)
     seed_returns.append(seed_return)
 
 return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
                                                file_name=os.path.join(path, 'return_statistic.json'))
-plot.smoothed_plot_mean_deviation(path+'/returns.png', return_statistic, x_label='Cycle', y_label='Average returns')
+plot.smoothed_plot_mean_deviation(path + '/returns.png', return_statistic, x_label='Cycle', y_label='Average returns')

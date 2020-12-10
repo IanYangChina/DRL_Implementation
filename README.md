@@ -7,7 +7,7 @@
 #### Current status: under development  
 
 #### Algorithms: Flat
-- [ ] DQN - Deterministic, Discrete
+- [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
 - [X] DDPG - Deterministic, Continuous
 - [ ] PPO - Stochastic, Continuous
 - [X] TD3 -Deterministic, Discrete
@@ -36,6 +36,7 @@
 #### Reference Papers
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)
 * [DoubleDQN](https://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/viewPaper/12389)
+* [LSTM network on raw Atari pixel observation](https://arxiv.org/pdf/1907.02908.pdf)
 * [DDPG](https://arxiv.org/abs/1509.02971)
 * [TD3](https://arxiv.org/pdf/1802.09477.pdf)
 * [SAC (Adaptive Temperature)](https://arxiv.org/pdf/1812.05905.pdf)

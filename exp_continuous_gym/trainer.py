@@ -11,7 +11,7 @@ T = namedtuple("transition",
 
 
 class Trainer(object):
-    def __init__(self, env, agent, prioritised, seed, render, path):
+    def __init__(self, env, seed, render, path, agent, prioritised, discard_time_limit=False):
         if not os.path.isdir(path):
             os.mkdir(path)
         self.data_path = path + '/data'
@@ -28,9 +28,9 @@ class Trainer(object):
                       'init_input_means': np.zeros((obs.shape[0],)),
                       'init_input_var': np.ones((obs.shape[0],))
                       }
-        self.agent = agent(env_params, T, path=path, seed=seed, prioritised=prioritised)
+        self.agent = agent(env_params, T, path=path, seed=seed, prioritised=prioritised, discard_time_limit=discard_time_limit)
 
-    def run(self, test=False, n_episodes=50, load_network_ep=None):
+    def run(self, test=False, n_episodes=51, load_network_ep=None):
         if test:
             assert load_network_ep is not None
             self.agent.load_network(load_network_ep)
@@ -61,7 +61,7 @@ class Trainer(object):
             ep_returns.append(ep_return)
             print("Episode %i" % ep, "return %0.1f" % ep_return)
 
-            if (ep % 50 == 0) and (ep != 0) and (not test):
+            if (ep % 25 == 0) and (ep != 0) and (not test):
                 self.agent.save_networks(ep)
 
         if not test:
