@@ -8,7 +8,7 @@ from agent.utils.replay_buffer import *
 
 
 class DDPGAgent(object):
-    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, prioritised=True,
+    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, prioritised=True, discard_time_limit=False,
                  noise_deviation_rate=0.05, random_action_chance=0.2,
                  memory_capacity=int(1e6), optimization_steps=40, tau=0.005, batch_size=128,
                  discount_factor=0.98, learning_rate=0.001):
@@ -50,6 +50,7 @@ class DDPGAgent(object):
         self.batch_size = batch_size
         self.optimizer_steps = optimization_steps
         self.gamma = discount_factor
+        self.discard_time_limit = discard_time_limit
         self.tau = tau
         self.soft_update(tau=1)
 
@@ -101,6 +102,9 @@ class DDPGAgent(object):
             actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+
+            if self.discard_time_limit:
+                done = done * 0 + 1
 
             self.actor_target.eval()
             self.critic_target.eval()
