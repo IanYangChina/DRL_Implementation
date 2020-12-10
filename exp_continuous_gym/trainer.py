@@ -30,7 +30,7 @@ class Trainer(object):
                       }
         self.agent = agent(env_params, T, path=path, seed=seed, prioritised=prioritised, discard_time_limit=discard_time_limit)
 
-    def run(self, test=False, n_episodes=51, load_network_ep=None):
+    def run(self, test=False, n_episodes=101, load_network_ep=None):
         if test:
             assert load_network_ep is not None
             self.agent.load_network(load_network_ep)

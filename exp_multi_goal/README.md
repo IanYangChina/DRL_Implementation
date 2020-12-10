@@ -36,5 +36,4 @@ add normal noise into increments along each axes with standard deviation equal t
 * Prioritised replay supported.
     
 #### Results on the task 'Reach'
-<img src="sac_pybullet_gym/Reach_HER/seed11/data/cycle_returns.png" width="250"/>
-<img src="sac_pybullet_gym/Reach_PHER/seed11/data/cycle_returns.png" width="250"/>
+<img src="../src/returns_pybullet_kuka_reach.png" width="250"/>

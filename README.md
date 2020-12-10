@@ -33,6 +33,10 @@
 - [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics Multigoal Pybullet Migration) (Continuous, Official)
 - [ ] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous, Customized)
 
+#### Some result figures
+<img src="/src/returns_pybullet_kuka_reach.png" width="250"/>
+<img src="/src/returns_pybullet_half_cheetah.png" width="250"/>
+
 #### Reference Papers
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)
 * [DoubleDQN](https://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/viewPaper/12389)
