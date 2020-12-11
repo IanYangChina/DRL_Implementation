@@ -37,7 +37,7 @@
 <img src="/src/returns_pybullet_kuka_reach.png" width="350"/>
 <img src="/src/returns_half_cheetah.png" width="350"/>
 
-#### Reference Papers
+#### Reference Papers: Algorithm
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)
 * [DoubleDQN](https://www.aaai.org/ocs/index.php/AAAI/AAAI16/paper/viewPaper/12389)
 * [LSTM network on raw Atari pixel observation](https://arxiv.org/pdf/1907.02908.pdf)
@@ -52,6 +52,11 @@
 * [OptionCritic](https://www.aaai.org/ocs/index.php/AAAI/AAAI17/paper/viewPaper/14858)
 * [D4PG](https://arxiv.org/abs/1804.08617)
 * [R2D2](https://openreview.net/pdf?id=r1lyTjAqYX)
+
+#### Reference Papers: Implementation Matters
+* [Time limit](https://arxiv.org/abs/1712.00378)
+* [SOTA PPO Hyperparameters (many applicable to other algorithms)](https://arxiv.org/abs/2006.05990)
+* [SAC Temperature Auto-tuning](https://arxiv.org/abs/1812.05905)
 
 #### Reference Repos
 * [RL-Adventure-DDPG by higgsfield](https://github.com/higgsfield/RL-Adventure-2/blob/master/5.ddpg.ipynb)
