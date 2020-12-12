@@ -10,7 +10,7 @@ from agent.utils.replay_buffer import *
 class SACAgent(object):
     def __init__(self, env_params, transition_namedtuple, path=None, seed=0, prioritised=True,
                  memory_capacity=int(1e6), optimization_steps=40, tau=0.005, batch_size=128,
-                 discount_factor=0.98, learning_rate=0.001, alpha=0.2, discard_time_limit=False):
+                 discount_factor=0.98, learning_rate=0.0001, alpha_learning_rate=0.0001, discard_time_limit=False):
         T.manual_seed(seed)
         R.seed(seed)
         self.rng = np.random.default_rng(seed=seed)
@@ -57,7 +57,7 @@ class SACAgent(object):
         self.target_entropy = -self.action_dim
         self.log_alpha = T.zeros(1, requires_grad=True, device=self.device)
         self.alpha = self.log_alpha.exp()
-        self.alpha_optimizer = Adam([self.log_alpha], lr=learning_rate)
+        self.alpha_optimizer = Adam([self.log_alpha], lr=alpha_learning_rate)
         self.alpha_record = []
         self.policy_entropy_record = []
 

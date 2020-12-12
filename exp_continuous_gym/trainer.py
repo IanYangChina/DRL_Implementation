@@ -65,10 +65,13 @@ class Trainer(object):
                 self.agent.save_networks(ep)
 
         if not test:
-            # smoothed_plot(self.data_path+"/episode_returns.png", ep_returns, x_label="Episode")
+            smoothed_plot(self.data_path+"/alpha.png", self.agent.alpha_record, x_label='Timestep', y_label='Alpha', window=5)
             np.save(self.data_path + '/alpha_record', self.agent.alpha_record)
+            smoothed_plot(self.data_path+"/policy_entropy.png", self.agent.policy_entropy_record, x_label='Timestep', y_label='Policy entropy', window=5)
             np.save(self.data_path + '/policy_entropy_record', self.agent.policy_entropy_record)
+            smoothed_plot(self.data_path+"/episode_returns.png", ep_returns, x_label="Episode")
             np.save(self.data_path + '/episode_returns', ep_returns)
+
             np.save(self.data_path + "/input_means", self.agent.normalizer.history_mean)
             np.save(self.data_path + "/input_vars", self.agent.normalizer.history_var)
             return ep_returns
