@@ -53,10 +53,12 @@ class SACAgent(object):
         self.tau = tau
         self.critic_target_soft_update(tau=1)
 
-        self.alpha = T.tensor(alpha, dtype=T.float32, device=self.device)
+        # self.alpha = T.tensor(alpha, dtype=T.float32, device=self.device)
         self.target_entropy = -self.action_dim
         self.log_alpha = T.zeros(1, requires_grad=True, device=self.device)
+        self.alpha = self.log_alpha.exp()
         self.alpha_optimizer = Adam([self.log_alpha], lr=learning_rate)
+        self.alpha_record = []
 
     def select_action(self, state, *args):
         inputs = self.normalizer(state)
@@ -134,6 +136,8 @@ class SACAgent(object):
             alpha_loss.backward()
             self.alpha_optimizer.step()
             self.alpha = self.log_alpha.exp()
+
+            self.alpha_record.append(self.alpha.detach().cpu().numpy())
 
             self.critic_target_soft_update()
 
