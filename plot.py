@@ -1,5 +1,7 @@
 import json
 import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from copy import deepcopy as dcp
 from mpl_toolkits.axes_grid1 import make_axes_locatable, axes_size
