@@ -17,8 +17,8 @@ for seed in seeds:
                       prioritised=False)
 
     seed_return = trainer.run(test=False, n_episodes=60, load_network_ep=150)
-    plot.smoothed_plot(path + 'alpha.png', trainer.agent.alpha_record, x_label='update step', y_label='alpha', window='5')
-    plot.smoothed_plot(path + 'policy_entropy.png', trainer.agent.policy_entropy_record, x_label='update step', y_label='policy entropy', window='5')
+    plot.smoothed_plot(path + 'alpha.png', trainer.agent.alpha_record, x_label='update step', y_label='alpha', window=5)
+    plot.smoothed_plot(path + 'policy_entropy.png', trainer.agent.policy_entropy_record, x_label='update step', y_label='policy entropy', window=5)
 #     seed_returns.append(seed_return)
 #
 # return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
