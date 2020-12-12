@@ -59,6 +59,7 @@ class SACAgent(object):
         self.alpha = self.log_alpha.exp()
         self.alpha_optimizer = Adam([self.log_alpha], lr=learning_rate)
         self.alpha_record = []
+        self.policy_entropy_record = []
 
     def select_action(self, state, *args):
         inputs = self.normalizer(state)
@@ -138,6 +139,7 @@ class SACAgent(object):
             self.alpha = self.log_alpha.exp()
 
             self.alpha_record.append(self.alpha.detach().cpu().numpy())
+            self.policy_entropy_record.append(-new_log_probs.detach().mean().cpu().numpy())
 
             self.critic_target_soft_update()
 
