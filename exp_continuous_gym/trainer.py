@@ -66,6 +66,8 @@ class Trainer(object):
 
         if not test:
             # smoothed_plot(self.data_path+"/episode_returns.png", ep_returns, x_label="Episode")
+            np.save(self.data_path + '/alpha_record', self.agent.alpha_record)
+            np.save(self.data_path + '/policy_entropy_record', self.agent.policy_entropy_record)
             np.save(self.data_path + '/episode_returns', ep_returns)
             np.save(self.data_path + "/input_means", self.agent.normalizer.history_mean)
             np.save(self.data_path + "/input_vars", self.agent.normalizer.history_var)
