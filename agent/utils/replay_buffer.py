@@ -4,8 +4,9 @@ from .segment_tree import SumSegmentTree, MinSegmentTree
 
 
 class ReplayBuffer(object):
-    def __init__(self, capacity, tr_namedtuple, seed=0):
+    def __init__(self, capacity, tr_namedtuple, seed=0, saving_path=None):
         R.seed(seed)
+        self.saving_path = saving_path
         self.capacity = capacity
         self.memory = []
         self.position = 0  # 99, rewrite from the 0-th transition
@@ -20,6 +21,43 @@ class ReplayBuffer(object):
     def sample(self, batch_size):
         batch = R.sample(self.memory, batch_size)  # uniform sampling
         return self.Transition(*zip(*batch))
+
+    def save_as_npy(self, start=None, end=None):
+        assert self.saving_path is not None
+        if start is None:
+            batch = self.Transition(*zip(*self.memory))
+        else:
+            assert end is not None
+            batch = self.Transition(*zip(*self.memory[start:end]))
+
+        np.save(self.saving_path+'/observations', np.array(batch.observation))
+        np.save(self.saving_path+'/actions', np.array(batch.action))
+        np.save(self.saving_path+'/next_observations', np.array(batch.next_observation))
+        np.save(self.saving_path+'/reward', np.array(batch.reward))
+        np.save(self.saving_path+'/done', np.array(batch.done))
+
+    def load_from_npy(self):
+        assert self.saving_path is not None
+        observations = np.load(self.saving_path+'/observations.npy')
+        actions = np.load(self.saving_path+'/actions.npy')
+        next_observations = np.load(self.saving_path+'/next_observations.npy')
+        reward = np.load(self.saving_path+'/reward.npy')
+        done = np.load(self.saving_path+'/done.npy')
+
+        for i in range(observations.shape[0]):
+            self.store_experience(observations[i],
+                                  actions[i],
+                                  next_observations[i],
+                                  reward[i],
+                                  done[i])
+
+    def clear_memory(self):
+        self.memory.clear()
+        self.position = 0
+
+    @property
+    def full_memory(self):
+        return self.Transition(*zip(*self.memory))
 
     def __len__(self):
         return len(self.memory)

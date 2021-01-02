@@ -11,7 +11,7 @@ T = namedtuple("transition",
 
 
 class Trainer(object):
-    def __init__(self, env, seed, render, path, agent, prioritised, discard_time_limit=False):
+    def __init__(self, env, seed, render, path, agent, prioritised=False, discard_time_limit=False, update_interval=1):
         if not os.path.isdir(path):
             os.mkdir(path)
         self.data_path = path + '/data'
@@ -29,6 +29,7 @@ class Trainer(object):
                       'init_input_var': np.ones((obs.shape[0],))
                       }
         self.agent = agent(env_params, T, path=path, seed=seed, prioritised=prioritised, discard_time_limit=discard_time_limit)
+        self.update_interval = update_interval
 
     def run(self, test=False, n_episodes=101, load_network_ep=None):
         if test:
@@ -41,6 +42,7 @@ class Trainer(object):
         EPISODE = n_episodes
 
         ep = 0
+        step = 0
         while ep < EPISODE:
             done = False
             obs = self.env.reset()
@@ -54,8 +56,10 @@ class Trainer(object):
                     self.agent.remember(obs, action, new_obs, reward, 1-int(done))
                     self.agent.normalizer.store_history(new_obs)
                     self.agent.normalizer.update_mean()
-                    self.agent.learn(steps=1)
+                    if (self.update_interval % step == 0) and (step != 0):
+                        self.agent.learn(steps=1)
                 obs = new_obs
+                step += 1
             ep += 1
 
             ep_returns.append(ep_return)
@@ -65,10 +69,10 @@ class Trainer(object):
                 self.agent.save_networks(ep)
 
         if not test:
-            smoothed_plot(self.data_path+"/alpha.png", self.agent.alpha_record, x_label='Timestep', y_label='Alpha', window=5)
-            np.save(self.data_path + '/alpha_record', self.agent.alpha_record)
-            smoothed_plot(self.data_path+"/policy_entropy.png", self.agent.policy_entropy_record, x_label='Timestep', y_label='Policy entropy', window=5)
-            np.save(self.data_path + '/policy_entropy_record', self.agent.policy_entropy_record)
+            # smoothed_plot(self.data_path+"/alpha.png", self.agent.alpha_record, x_label='Timestep', y_label='Alpha', window=5)
+            # np.save(self.data_path + '/alpha_record', self.agent.alpha_record)
+            # smoothed_plot(self.data_path+"/policy_entropy.png", self.agent.policy_entropy_record, x_label='Timestep', y_label='Policy entropy', window=5)
+            # np.save(self.data_path + '/policy_entropy_record', self.agent.policy_entropy_record)
             smoothed_plot(self.data_path+"/episode_returns.png", ep_returns, x_label="Episode")
             np.save(self.data_path + '/episode_returns', ep_returns)
 
