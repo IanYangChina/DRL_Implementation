@@ -3,7 +3,7 @@ import torch as T
 import numpy as np
 import json
 from collections import namedtuple
-from utils.plot import smoothed_plot
+from plot import smoothed_plot
 from agent.utils.replay_buffer import *
 from agent.utils.normalizer import Normalizer
 t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
