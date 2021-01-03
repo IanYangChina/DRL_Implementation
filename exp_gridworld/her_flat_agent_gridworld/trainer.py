@@ -17,9 +17,7 @@ class Trainer(object):
         self.env = env
         opt_obs, obs = self.env.reset()
         self.is_inv = is_inv
-        ActTr = namedtuple('ActionTransition',
-                           ('state', 'inventory', 'desired_goal', 'action', 'next_state', 'next_inventory', 'next_goal',
-                            'achieved_goal', 'reward', 'done'))
+
         env_params = {'input_max': env.input_max,
                       'input_min': env.input_min,
                       'input_dim': obs['state'].shape[0] + obs['desired_goal_loc'].shape[0] + obs['inventory_vector'].shape[0],
@@ -30,9 +28,9 @@ class Trainer(object):
             env_params['input_dim'] = obs['state'].shape[0] + obs['desired_goal_loc'].shape[0]
 
         if agent_type == "dqn":
-            self.agent = HindsightDQN(env_params, ActTr, path=self.path, seed=seed, hindsight=True)
+            self.agent = HindsightDQN(env_params, path=self.path, seed=seed, hindsight=True)
         elif agent_type == "td3":
-            self.agent = HindsightTD3(env_params, ActTr, path=self.path, seed=seed, hindsight=True)
+            self.agent = HindsightTD3(env_params, path=self.path, seed=seed, hindsight=True)
         else:
             raise ValueError("Agent: {} doesn't exist, choose one among ['dqn', 'td3'], "
                              "default type is 'dqn".format(agent_type))

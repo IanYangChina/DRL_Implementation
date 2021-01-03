@@ -76,3 +76,19 @@ class LinearDecayGreedy(object):
             if count > self.decay:
                 count = self.dacay
         return self.start - count*(self.start - self.end)/self.decay
+
+
+class ConstantChance(object):
+    def __init__(self, chance=0.2, rng=None):
+        self.chance = chance
+        if rng is None:
+            self.rng = np.random.default_rng(seed=0)
+        else:
+            self.rng = rng
+
+    def __call__(self):
+        chance = self.rng.uniform(0, 1)
+        if chance >= self.chance:
+            return True
+        else:
+            return False

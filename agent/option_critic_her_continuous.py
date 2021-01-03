@@ -10,7 +10,7 @@ from agent.utils.networks import Critic, ContinuousIntraPolicy
 from agent.utils.exploration_strategy import ExpDecayGreedy
 
 
-class OptionCritic(object):
+class HindsightOptionCritic(object):
     def __init__(self, env_params, act_tr_namedtuple, opt_tr_namedtuple, path=None, seed=0, double_q=False,
                  option_lr=1e-5, opt_mem_capacity=int(1e6), opt_batch_size=128, opt_tau=0.5, opt_optimization_steps=10,
                  eps_start=1, eps_end=0.05, eps_decay=50000,

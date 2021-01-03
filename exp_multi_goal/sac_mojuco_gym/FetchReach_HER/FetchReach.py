@@ -1,5 +1,4 @@
 import os
-from agent.sac_her_continuous import HindsightSACAgent
 from exp_multi_goal.trainer import Trainer
 seeds = [11, 22, 33, 44, 55, 66]
 
@@ -11,7 +10,7 @@ for seed in seeds:
         os.mkdir(path)
 
     trainer = Trainer(env="FetchReach-v1",
-                      agent=HindsightSACAgent,
+                      agent_type='sac_her',
                       hindsight=True,
                       prioritised=False,
                       seed=seed,

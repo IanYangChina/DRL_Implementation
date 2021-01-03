@@ -28,7 +28,7 @@ class Trainer(object):
                       'primitive_output_dim': len(self.env.actions),
                       'env_type': self.env.env_type}
         self.hindsight = hindsight
-        self.agent = OptionCritic(env_params, OptTr, path=self.path, seed=seed, option_num=4)
+        self.agent = OptionCritic(env_params, path=self.path, seed=seed, option_num=4)
 
         self.training_epoch = training_epoch
         self.training_cycle = training_cycle

@@ -1,6 +1,5 @@
 import os
 import plot
-from agent.ddpg_her_continuous import HindsightDDPGAgent
 from exp_multi_goal.trainer import Trainer
 
 seeds = [11, 22, 33, 44, 55, 66]
@@ -12,7 +11,7 @@ for seed in seeds:
 
     seed_path = path + '/seed' + str(seed)
     trainer = Trainer(env="KukaReachSparseEnv-v0",
-                      agent=HindsightDDPGAgent,
+                      agent_type='ddpg_her',
                       hindsight=True,
                       prioritised=True,
                       seed=seed,

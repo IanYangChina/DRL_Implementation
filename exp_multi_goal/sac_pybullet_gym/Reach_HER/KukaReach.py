@@ -1,6 +1,5 @@
 import os
 import plot
-from agent.sac_her_continuous import HindsightSACAgent
 from exp_multi_goal.trainer import Trainer
 
 seeds = [11, 22, 33, 44, 55, 66]
@@ -11,7 +10,7 @@ path = os.path.dirname(os.path.realpath(__file__))
 for seed in seeds:
     seed_path = path + '/seed' + str(seed)
     trainer = Trainer(env="KukaReachSparseEnv-v0",
-                      agent=HindsightSACAgent,
+                      agent_type='sac_her',
                       hindsight=True,
                       prioritised=False,
                       seed=seed,

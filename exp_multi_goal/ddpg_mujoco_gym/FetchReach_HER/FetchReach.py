@@ -1,5 +1,4 @@
 import os
-from agent.ddpg_her_continuous import HindsightDDPGAgent
 from exp_multi_goal.trainer import Trainer
 seeds = [11, 22, 33, 44, 55, 66]
 
@@ -12,7 +11,7 @@ for seed in seeds:
 
     trainer = Trainer(env="FetchReach-v1",
                       render=False,
-                      agent=HindsightDDPGAgent,
+                      agent_type='ddpg_her',
                       hindsight=True,
                       prioritised=False,
                       seed=seed,

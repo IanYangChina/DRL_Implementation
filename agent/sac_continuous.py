@@ -5,11 +5,13 @@ from torch.optim.adam import Adam
 from agent.utils.normalizer import Normalizer
 from agent.utils.networks import StochasticActor, Critic
 from agent.utils.replay_buffer import *
+from collections import namedtuple
+t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
 
 
 class SACAgent(object):
-    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, prioritised=True,
-                 memory_capacity=int(1e6), optimization_steps=40, tau=0.005, batch_size=128,
+    def __init__(self, env_params, path=None, seed=0, prioritised=True,
+                 memory_capacity=int(1e6), optimization_steps=1, tau=0.005, batch_size=128,
                  discount_factor=0.98, learning_rate=0.0001, alpha_learning_rate=0.0001, discard_time_limit=False):
         T.manual_seed(seed)
         R.seed(seed)
@@ -32,9 +34,9 @@ class SACAgent(object):
 
         self.prioritised = prioritised
         if not self.prioritised:
-            self.buffer = ReplayBuffer(memory_capacity, transition_namedtuple, seed=seed)
+            self.buffer = ReplayBuffer(memory_capacity, t, seed=seed)
         else:
-            self.buffer = PrioritisedReplayBuffer(memory_capacity, transition_namedtuple, rng=self.rng)
+            self.buffer = PrioritisedReplayBuffer(memory_capacity, t, rng=self.rng)
         self.batch_size = batch_size
         self.optimization_steps = optimization_steps
         self.gamma = discount_factor

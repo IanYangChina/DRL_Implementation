@@ -2,6 +2,7 @@ import os
 import gym
 import numpy as np
 import pybullet_multigoal_gym as pgm
+from agent import agents
 from plot import smoothed_plot
 from collections import namedtuple
 
@@ -10,7 +11,7 @@ T = namedtuple("transition",
 
 
 class Trainer(object):
-    def __init__(self, env, agent, hindsight, prioritised,
+    def __init__(self, env, agent_type, hindsight, prioritised,
                  seed, path, render=False):
         if not os.path.isdir(path):
             os.mkdir(path)
@@ -31,7 +32,8 @@ class Trainer(object):
                       'init_input_means': np.zeros((obs['state'].shape[0] + obs['desired_goal'].shape[0],)),
                       'init_input_var': np.ones((obs['state'].shape[0] + obs['desired_goal'].shape[0],))
                       }
-        self.agent = agent(env_params, T, path=path, seed=seed, hindsight=hindsight, prioritised=prioritised)
+        assert agent_type in ['ddpg_her', 'sac_her']
+        self.agent = agents[agent_type](env_params, T, path=path, seed=seed, hindsight=hindsight, prioritised=prioritised)
 
     def run(self, test=False, n_epochs=50, load_network_ep=None):
 

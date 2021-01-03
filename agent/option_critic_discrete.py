@@ -7,10 +7,15 @@ from torch.optim.adam import Adam
 from agent.utils.replay_buffer import ReplayBuffer
 from agent.utils.networks import Critic, IntraPolicy
 from agent.utils.exploration_strategy import ExpDecayGreedy
+from collections import namedtuple
+OptTr = namedtuple('OptionTransition',
+                   ('state', 'inventory', 'desired_goal',
+                    'option', 'achieved_goal', 'reward', 'done',
+                    'next_state', 'next_inventory', 'next_goal'))
 
 
 class OptionCritic(object):
-    def __init__(self, env_params, opt_tr_namedtuple, path=None, seed=0,
+    def __init__(self, env_params, path=None, seed=0,
                  option_lr=1e-5, opt_mem_capacity=int(1e6), opt_batch_size=128, opt_tau=0.5, opt_optimization_steps=10,
                  option_num=4, eps_start=1, eps_end=0.05, eps_decay=50000,
                  action_lr=1e-5, action_entropy_beta=0.01,
@@ -58,7 +63,7 @@ class OptionCritic(object):
         self.option_optimizer = Adam(self.option_q.parameters(), lr=option_lr)
         self.opt_optimization_steps = opt_optimization_steps
         self.option_policy_loss = []
-        self.option_memory = ReplayBuffer(opt_mem_capacity, opt_tr_namedtuple, seed=seed)
+        self.option_memory = ReplayBuffer(opt_mem_capacity, OptTr, seed=seed)
         self.opt_batch_size = opt_batch_size
         self.opt_tau = opt_tau
         self.opt_soft_update(tau=1)

@@ -1,23 +1,18 @@
 import os
 import numpy as np
-import gym
 import pybullet_envs
+from agent import agents
 from plot import smoothed_plot
-from collections import namedtuple
-
-
-T = namedtuple("transition",
-               ('state', 'action', 'next_state', 'reward', 'done'))
 
 
 class Trainer(object):
-    def __init__(self, env, seed, render, path, agent, prioritised=False, discard_time_limit=False, update_interval=1):
+    def __init__(self, env, seed, render, path, agent_type, prioritised=False, discard_time_limit=False, update_interval=1):
         if not os.path.isdir(path):
             os.mkdir(path)
         self.data_path = path + '/data'
         if not os.path.isdir(self.data_path):
             os.mkdir(self.data_path)
-        self.env = gym.make(env)
+        self.env = pybullet_envs.make(env)
         self.env.seed(seed)
         if render:
             self.env.render()
@@ -28,7 +23,9 @@ class Trainer(object):
                       'init_input_means': np.zeros((obs.shape[0],)),
                       'init_input_var': np.ones((obs.shape[0],))
                       }
-        self.agent = agent(env_params, T, path=path, seed=seed, prioritised=prioritised, discard_time_limit=discard_time_limit)
+        assert agent_type in ['ddpg', 'sac', 'ppo']
+        self.agent_type = agent_type
+        self.agent = agents[agent_type](env_params, path=path, seed=seed, prioritised=prioritised, discard_time_limit=discard_time_limit)
         self.update_interval = update_interval
 
     def run(self, test=False, n_episodes=101, load_network_ep=None):
@@ -49,15 +46,21 @@ class Trainer(object):
             ep_return = 0
             # start a new episode
             while not done:
-                action = self.agent.select_action(obs, test)
+                if self.agent_type == 'ppo':
+                    action, prob = self.agent.select_action(obs, log_probs=True, test=test)
+                else:
+                    action = self.agent.select_action(obs, test=test)
                 new_obs, reward, done, info = self.env.step(action)
                 ep_return += reward
                 if not test:
-                    self.agent.remember(obs, action, new_obs, reward, 1-int(done))
+                    if self.agent_type == 'ppo':
+                        self.agent.remember(obs, action, prob, new_obs, reward, 1-int(done))
+                    else:
+                        self.agent.remember(obs, action, new_obs, reward, 1-int(done))
                     self.agent.normalizer.store_history(new_obs)
                     self.agent.normalizer.update_mean()
-                    if (self.update_interval % step == 0) and (step != 0):
-                        self.agent.learn(steps=1)
+                    if (step % self.update_interval == 0) and (step != 0):
+                        self.agent.learn()
                 obs = new_obs
                 step += 1
             ep += 1

@@ -4,13 +4,20 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
+from collections import namedtuple
 from agent.utils.networks import Critic
 from agent.utils.replay_buffer import ReplayBuffer, GridWorldHindsightReplayBuffer
 from agent.utils.exploration_strategy import ExpDecayGreedy, GoalSucRateBasedExpGreed
+OptTr = namedtuple('OptionTransition',
+                   ('state', 'inventory', 'final_goal', 'option', 'next_state', 'next_inventory', 'next_goal',
+                    'option_done', 'reward', 'done'))
+ActTr = namedtuple('ActionTransition',
+                   ('state', 'inventory', 'desired_goal', 'action', 'next_state', 'next_inventory', 'next_goal',
+                    'achieved_goal', 'reward', 'done'))
 
 
 class OptionDQN(object):
-    def __init__(self, env_params, opt_tr_namedtuple, act_tr_namedtuple, path=None, seed=0,
+    def __init__(self, env_params, path=None, seed=0,
                  act_exploration=None, sub_suc_percentage=None, gsrb_decay=None, act_eps_decay=30000,
                  option_lr=1e-5, opt_mem_capacity=int(1e6), opt_batch_size=256, opt_tau=0.2,
                  action_lr=1e-5, act_mem_capacity=int(1e6), act_batch_size=256, act_tau=0.05, clip_value=5.0,
@@ -44,7 +51,7 @@ class OptionDQN(object):
         self.option_agent = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_target = Critic(self.opt_input_dim, self.opt_output_dim).to(self.device)
         self.option_optimizer = Adam(self.option_agent.parameters(), lr=option_lr)
-        self.option_memory = ReplayBuffer(opt_mem_capacity, opt_tr_namedtuple, seed=seed)
+        self.option_memory = ReplayBuffer(opt_mem_capacity, OptTr, seed=seed)
         self.opt_batch_size = opt_batch_size
         self.opt_mean_q_tmp = []
         self.opt_mean_q = []
@@ -59,7 +66,7 @@ class OptionDQN(object):
         self.action_agent = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
         self.action_target = Critic(self.act_input_dim, self.act_output_dim).to(self.device)
         self.action_optimizer = Adam(self.action_agent.parameters(), lr=action_lr)
-        self.action_memory = GridWorldHindsightReplayBuffer(act_mem_capacity, act_tr_namedtuple, seed=seed)
+        self.action_memory = GridWorldHindsightReplayBuffer(act_mem_capacity, ActTr, seed=seed)
         self.act_batch_size = act_batch_size
         self.act_mean_q_tmp = []
         self.act_mean_q = []

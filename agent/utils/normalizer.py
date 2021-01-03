@@ -2,13 +2,21 @@ import numpy as np
 
 
 class Normalizer(object):
-    def __init__(self, input_dims, init_mean, init_var, scale_factor=1, epsilon=1e-2, clip_range=5):
+    def __init__(self, input_dims, init_mean, init_var, scale_factor=1, epsilon=1e-3, clip_range=None):
         self.input_dims = input_dims
         self.sample_count = 0
         self.history = []
         self.history_mean = init_mean
         self.history_var = init_var
+        if self.history_mean is None:
+            self.history_mean = np.zeros(self.input_dims)
+        if self.history_var is None:
+            self.history_var = np.ones(self.input_dims)
+        assert self.history_mean.shape == (self.input_dims,)
+        assert self.history_var.shape == (self.input_dims,)
         self.epsilon = epsilon*np.ones(self.input_dims)
+        if clip_range is None:
+            clip_range = 1e3
         self.input_clip_range = (-clip_range*np.ones(self.input_dims), clip_range*np.ones(self.input_dims))
         self.scale_factor = scale_factor
 

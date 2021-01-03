@@ -1,6 +1,5 @@
 import os
 import plot
-from agent.ppo_continuous import PPOAgent
 from exp_continuous_gym.trainer import Trainer
 seeds = [11, 22, 33, 44, 55, 66]
 seed_returns = []
@@ -13,7 +12,7 @@ for seed in seeds:
                       seed=seed,
                       render=False,
                       path=seed_path,
-                      agent=PPOAgent,
+                      agent_type='ppo',
                       update_interval=128)
 
     seed_return = trainer.run(test=False, load_network_ep=150)

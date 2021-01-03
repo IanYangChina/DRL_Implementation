@@ -362,12 +362,10 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
 
 class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8,
-                 sampled_goal_num=4, reward_value=0.0, level='low', goal_type='state',
+                 sampled_goal_num=4, reward_value=0.0, goal_type='state',
                  rng=None):
         self.k = sampled_goal_num
         self.r = reward_value
-        assert level in ['low', 'high']
-        self.lv = level
         self.goal_type = goal_type
         assert self.goal_type in ['state', 'image']
         PrioritisedEpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, alpha=alpha, beta=beta, rng=rng)
@@ -375,70 +373,38 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
     def modify_episodes(self):
         if len(self.episodes) == 0:
             return
-        if self.lv == 'low':
-            for _ in range(len(self.episodes)):
-                ep = self.episodes[_]
-                if len(ep) < 2:
-                    continue
-                goals = self.sample_achieved_goal_random(ep)
-                for n in range(len(goals[0])):
-                    # ind = goals[0][n]
-                    # goal = goals[1][n]
-                    modified_ep = []
-                    for tr in range(goals[0][n]+1):
-                        s = ep[tr].state
-                        dg = goals[1][n]
-                        a = ep[tr].action
-                        ns = ep[tr].next_state
-                        ag = ep[tr].achieved_goal
-                        r = goal_distance_reward(dg, ag)
-                        d = ep[tr].done
-                        if self.goal_type == 'image':
-                            obs = ep[tr].observation
-                            dgi = goals[2][n]
-                            nobs = ep[tr].next_observation
-                            agi = ep[tr].achieved_goal_image
-                            if tr == goals[0][n]:
-                                modified_ep.append(self.Transition(s, obs, dg, dgi, a, ns, nobs, ag, agi, r, 0))
-                            else:
-                                modified_ep.append(self.Transition(s, obs, dg, dgi, a, ns, nobs, ag, agi, r, d))
+        for _ in range(len(self.episodes)):
+            ep = self.episodes[_]
+            if len(ep) < 2:
+                continue
+            goals = self.sample_achieved_goal_random(ep)
+            for n in range(len(goals[0])):
+                # ind = goals[0][n]
+                # goal = goals[1][n]
+                modified_ep = []
+                for tr in range(goals[0][n]+1):
+                    s = ep[tr].state
+                    dg = goals[1][n]
+                    a = ep[tr].action
+                    ns = ep[tr].next_state
+                    ag = ep[tr].achieved_goal
+                    r = goal_distance_reward(dg, ag)
+                    d = ep[tr].done
+                    if self.goal_type == 'image':
+                        obs = ep[tr].observation
+                        dgi = goals[2][n]
+                        nobs = ep[tr].next_observation
+                        agi = ep[tr].achieved_goal_image
+                        if tr == goals[0][n]:
+                            modified_ep.append(self.Transition(s, obs, dg, dgi, a, ns, nobs, ag, agi, r, 0))
                         else:
-                            if tr == goals[0][n]:
-                                modified_ep.append(self.Transition(s, dg, a, ns, ag, r, 0))
-                            else:
-                                modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                    self.episodes.append(modified_ep)
-        else:
-            for _ in range(len(self.episodes)):
-                ep = self.episodes[_]
-                if len(ep) < 2:
-                    continue
-                goals = self.sample_achieved_goal_random(ep)
-                for n in range(len(goals[0])):
-                    ind = goals[0][n]
-                    goal = goals[1][n]
-                    modified_ep = []
-                    o_done_count = 0
-                    for tr in range(1, ind + 1):
-                        # index starts from -1 towards 0
-                        s = ep[-tr].state
-                        dg = goal
-                        if o_done_count == 0:
-                            o = goal
+                            modified_ep.append(self.Transition(s, obs, dg, dgi, a, ns, nobs, ag, agi, r, d))
+                    else:
+                        if tr == goals[0][n]:
+                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, 0))
                         else:
-                            o = ep[-tr].option
-                        ns = ep[-tr].next_state
-                        ag = ep[-tr].achieved_goal
-                        o_done = ep[-tr].option_done
-                        if o_done == 0:
-                            o_done_count += 1
-                        r = ep[-tr].reward
-                        d = ep[-tr].done
-                        if tr == 1:
-                            modified_ep.append(self.Transition(s, dg, o, ns, ag, 0, self.r, 0))
-                        else:
-                            modified_ep.append(self.Transition(s, dg, o, ns, ag, o_done, r, d))
-                    self.episodes.append(modified_ep)
+                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+                self.episodes.append(modified_ep)
 
     def sample_achieved_goal_random(self, ep):
         assert (len(ep)-1) >= 0

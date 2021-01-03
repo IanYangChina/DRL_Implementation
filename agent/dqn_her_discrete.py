@@ -4,13 +4,17 @@ import torch as T
 import random as R
 import torch.nn.functional as F
 from torch.optim.adam import Adam
+from collections import namedtuple
 from agent.utils.networks import Critic
 from agent.utils.replay_buffer import GridWorldHindsightReplayBuffer
 from agent.utils.exploration_strategy import ExpDecayGreedy
+t = namedtuple("transition",
+               ('state', 'inventory', 'desired_goal', 'action',
+                'next_state', 'next_inventory', 'next_goal', 'achieved_goal', 'reward', 'done'))
 
 
 class HindsightDQN(object):
-    def __init__(self, env_params, tr_namedtuple, path=None, seed=0, hindsight=True,
+    def __init__(self, env_params, path=None, seed=0, hindsight=True,
                  lr=1e-4, mem_capacity=int(1e6), batch_size=512, tau=0.5, clip_value=5.0,
                  optimization_steps=2, gamma=0.99, eps_start=1, eps_end=0.05, eps_decay=5000):
         """Seeding"""
@@ -39,7 +43,7 @@ class HindsightDQN(object):
         self.agent = Critic(self.input_dim, self.output_dim).to(self.device)
         self.target = Critic(self.input_dim, self.output_dim).to(self.device)
         self.optimizer = Adam(self.agent.parameters(), lr=lr)
-        self.memory = GridWorldHindsightReplayBuffer(mem_capacity, tr_namedtuple, seed=seed)
+        self.memory = GridWorldHindsightReplayBuffer(mem_capacity, t, seed=seed)
         # copy the parameters of the main network to the target network
         self.soft_update(tau=1)
         """Specify some hyper-parameters"""

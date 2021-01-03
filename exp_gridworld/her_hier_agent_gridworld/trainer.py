@@ -2,7 +2,6 @@ import os
 import numpy as np
 from plot import smoothed_plot, smoothed_plot_multi_line
 from copy import deepcopy as dcp
-from collections import namedtuple
 from agent.option_dqn_her_discrete import OptionDQN
 from agent.utils.demonstrator import Demonstrator
 
@@ -18,12 +17,6 @@ class Trainer(object):
                  saving_gap=50):
         np.set_printoptions(precision=3)
         self.path = path
-        OptTr = namedtuple('OptionTransition',
-                           ('state', 'inventory', 'final_goal', 'option', 'next_state', 'next_inventory', 'next_goal',
-                            'option_done', 'reward', 'done'))
-        ActTr = namedtuple('ActionTransition',
-                           ('state', 'inventory', 'desired_goal', 'action', 'next_state', 'next_inventory', 'next_goal',
-                            'achieved_goal', 'reward', 'done'))
 
         self.env = env
         opt_obs, act_obs = self.env.reset()
@@ -40,7 +33,7 @@ class Trainer(object):
                       'env_type': self.env.env_type}
         self.act_exploration = act_exploration
         self.act_hindsight = act_hindsight
-        self.agent = OptionDQN(env_params, OptTr, ActTr,
+        self.agent = OptionDQN(env_params,
                                path=self.path, seed=seed,
                                opt_eps_decay_start=training_epoch*training_cycle*training_episode*0.5,
                                act_exploration=self.act_exploration, sub_suc_percentage=sub_suc_percentage,

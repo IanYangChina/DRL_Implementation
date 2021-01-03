@@ -5,10 +5,12 @@ from torch.optim.adam import Adam
 from agent.utils.normalizer import Normalizer
 from agent.utils.networks import Actor, Critic
 from agent.utils.replay_buffer import *
+from collections import namedtuple
+t = namedtuple("transition", ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
 
 
 class HindsightDDPGAgent(object):
-    def __init__(self, env_params, transition_namedtuple, path=None, seed=0, hindsight=True, prioritised=True,
+    def __init__(self, env_params, path=None, seed=0, hindsight=True, prioritised=True,
                  noise_deviation_rate=0.05, random_action_chance=0.2,
                  memory_capacity=int(1e6), optimization_steps=40, tau=0.005, batch_size=128, clip_rate=0.98,
                  discount_factor=0.98, learning_rate=0.001):
@@ -45,9 +47,9 @@ class HindsightDDPGAgent(object):
         self.hindsight = hindsight
         self.prioritised = prioritised
         if not self.prioritised:
-            self.buffer = HindsightReplayBuffer(memory_capacity, transition_namedtuple, sampled_goal_num=4, seed=seed)
+            self.buffer = HindsightReplayBuffer(memory_capacity, t, sampled_goal_num=4, seed=seed)
         else:
-            self.buffer = PrioritisedHindsightReplayBuffer(memory_capacity, transition_namedtuple, level='low', rng=self.rng)
+            self.buffer = PrioritisedHindsightReplayBuffer(memory_capacity, t, rng=self.rng)
 
         self.batch_size = batch_size
         self.optimizer_steps = optimization_steps

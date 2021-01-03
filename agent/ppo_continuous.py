@@ -5,13 +5,15 @@ from torch.optim.adam import Adam
 from agent.utils.normalizer import Normalizer
 from agent.utils.networks import StochasticActor, Critic
 from agent.utils.replay_buffer import *
+from collections import namedtuple
+t = namedtuple("transition", ('state', 'action', 'log_prob', 'next_state', 'reward', 'done'))
 
 
 class PPOAgent(object):
     """
     This PPO implementation follows the suggested setting given by https://arxiv.org/abs/2006.05990
     """
-    def __init__(self, env_params, transition_namedtuple, path=None, seed=0,
+    def __init__(self, env_params, path=None, seed=0,
                  memory_capacity=int(1e6), optimization_steps=3, batch_size=128, discount_factor=0.98, learning_rate=0.0001,
                  clip_epsilon=0.25, value_loss_weight=0.5, entropy_penalty_weight=0.01, return_normalization=False,
                  GAE_lambda=0.9, max_ep_step=50, prioritised=False, discard_time_limit=False):
@@ -33,7 +35,7 @@ class PPOAgent(object):
 
         self.normalizer = Normalizer(self.state_dim,
                                      env_params['init_input_means'], env_params['init_input_var'])
-        self.buffer = ReplayBuffer(memory_capacity, transition_namedtuple, seed=seed)
+        self.buffer = ReplayBuffer(memory_capacity, t, seed=seed)
         self.batch_size = batch_size
         self.optimization_steps = optimization_steps
         self.gamma = discount_factor
@@ -81,7 +83,7 @@ class PPOAgent(object):
         next_states = self.normalizer(batch.next_state)
         next_states = T.tensor(next_states, dtype=T.float32).to(self.device)
         actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
-        log_probs = T.tensor(batch.log_probs, dtype=T.float32).to(self.device)
+        log_probs = T.tensor(batch.log_prob, dtype=T.float32).to(self.device)
         rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
         done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
 
@@ -91,11 +93,13 @@ class PPOAgent(object):
         rewards = rewards.flip(0)
         done = done.flip(0)
         for i in range(rewards.shape[0]):
-            if done[i]:
+            # done flags are stored as 0/1 integers, where 0 represents a done state
+            if done[i] == 0:
                 discounted_return = 0
             discounted_return = rewards[i] + self.gamma * discounted_return
+            # insert n-step returns top-down
             returns.insert(0, discounted_return)
-        returns = T.tensor(returns, dtype=T.float32).to(self.device)
+        returns = T.tensor(returns, dtype=T.float32).unsqueeze(1).to(self.device)
         if self.return_normalization:
             returns = (returns - returns.mean()) / (returns.std() + 1e-5)
 
@@ -114,10 +118,11 @@ class PPOAgent(object):
             gae_t = 0
             advantages.flip(0)
             for i in range(rewards.shape[0]):
-                if done[i]:
+                if done[i] == 0:
                     gae_t = 0
                 gae_t = advantages[i] + self.GAE_lambda * gae_t
                 GAE.insert(0, (1-self.GAE_lambda)*gae_t)
+            GAE = T.tensor(GAE, dtype=T.float32).unsqueeze(1).to(self.device)
 
             L_clip = T.min(
                 ratio*GAE,
