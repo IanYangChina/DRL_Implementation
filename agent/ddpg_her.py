@@ -77,6 +77,7 @@ class DDPGHer(Agent):
                     cycle_return += ep_return
                     if ep_return > -50:
                         cycle_success += 1
+                self._learn()
 
                 self.statistic_dict['cycle_return'].append(cycle_return / self.training_episodes)
                 self.statistic_dict['cycle_success_rate'].append(cycle_success / self.training_episodes)
@@ -126,11 +127,10 @@ class DDPGHer(Agent):
                                new_episode=new_episode)
                 self.normalizer.store_history(np.concatenate((new_obs['state'],
                                                               new_obs['desired_goal']), axis=0))
-                self.normalizer.update_mean()
             obs = new_obs
             step += 1
             new_episode = False
-        self._learn()
+        self.normalizer.update_mean()
         return ep_return
 
     def _select_action(self, obs, test=False):
