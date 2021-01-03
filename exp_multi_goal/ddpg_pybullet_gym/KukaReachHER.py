@@ -4,13 +4,14 @@ import pybullet_multigoal_gym as pgm
 from agent import DDPGHer
 algo_params = {
     'hindsight': True,
+    'clip_value': 50,
     'prioritised': True,
     'memory_capacity': int(1e6),
     'learning_rate': 0.001,
     'update_interval': 1,
     'batch_size': 128,
-    'optimization_steps': 2,
-    'tau': 0.005,
+    'optimization_steps': 40,
+    'tau': 0.05,
     'discount_factor': 0.98,
     'discard_time_limit': True,
 

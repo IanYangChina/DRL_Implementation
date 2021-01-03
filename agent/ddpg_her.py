@@ -50,6 +50,7 @@ class DDPGHer(Agent):
         self.noise_deviation = algo_params['noise_deviation']
         # training args
         self.update_interval = algo_params['update_interval']
+        self.clip_value = algo_params['clip_value']
         # statistic dict
         self.statistic_dict.update({
             'cycle_return': [],
@@ -188,6 +189,7 @@ class DDPGHer(Agent):
                 critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
                 value_ = self.network_dict['critic_target'](critic_inputs_)
                 value_target = rewards + done * self.gamma * value_
+                value_target = T.clamp(value_target.detach(), -self.clip_value, 0)
 
             value_estimate = self.network_dict['critic'](critic_inputs)
             self.critic_optimizer.zero_grad()
@@ -205,8 +207,8 @@ class DDPGHer(Agent):
             actor_loss.backward()
             self.actor_optimizer.step()
 
-            self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
-            self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'])
-
             self.statistic_dict['critic_loss'].append(critic_loss.detach().mean().cpu().numpy().item())
             self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
+
+        self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
+        self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'])
