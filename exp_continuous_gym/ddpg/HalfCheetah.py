@@ -16,9 +16,10 @@ algo_params = {
     'random_action_chance': 0.2,
     'noise_deviation': 0.05,
 
-    'training_episodes': 3,
-    'testing_episodes': 30,
-    'saving_gap': 1,
+    'training_episodes': 151,
+    'testing_gap': 10,
+    'testing_episodes': 10,
+    'saving_gap': 50,
 }
 seeds = [11, 22, 33, 44, 55, 66]
 seed_returns = []
@@ -32,7 +33,7 @@ for seed in seeds:
 
     agent = DDPG(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    seed_returns.append(agent.statistic_dict['ep_return'])
+    seed_returns.append(agent.statistic_dict['ep_test_return'])
 
 return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
                                                file_name=os.path.join(path, 'return_statistic.json'))

@@ -7,35 +7,38 @@ from agent.agent_base import Agent
 from agent.utils.exploration_strategy import ConstantChance
 
 
-class DDPG(Agent):
+class DDPGHer(Agent):
     def __init__(self, algo_params, env, transition_tuple=None, path=None, seed=-1):
         # environment
         self.env = env
         self.env.seed(seed)
         obs = self.env.reset()
-        algo_params.update({'state_dim': obs.shape[0],
+        algo_params.update({'state_dim': obs['state'].shape[0],
+                            'goal_dim': obs['desired_goal'].shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
                             'init_input_means': None,
                             'init_input_vars': None
                             })
         # training args
+        self.training_epochs = algo_params['training_epochs']
+        self.training_cycles = algo_params['training_cycles']
         self.training_episodes = algo_params['training_episodes']
         self.testing_gap = algo_params['testing_gap']
         self.testing_episodes = algo_params['testing_episodes']
         self.saving_gap = algo_params['saving_gap']
 
-        super(DDPG, self).__init__(algo_params,
-                                   transition_tuple=transition_tuple,
-                                   goal_conditioned=False,
-                                   path=path,
-                                   seed=seed)
+        super(DDPGHer, self).__init__(algo_params,
+                                      transition_tuple=transition_tuple,
+                                      goal_conditioned=True,
+                                      path=path,
+                                      seed=seed)
         # torch
         self.network_dict.update({
-            'actor': Actor(self.state_dim, self.action_dim).to(self.device),
-            'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
-            'critic': Critic(self.state_dim + self.action_dim, 1).to(self.device),
-            'critic_target': Critic(self.state_dim + self.action_dim, 1).to(self.device)
+            'actor': Actor(self.state_dim + self.goal_dim, self.action_dim).to(self.device),
+            'actor_target': Actor(self.state_dim + self.goal_dim, self.action_dim).to(self.device),
+            'critic': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
+            'critic_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device)
         })
         self.network_keys_to_save = ['actor_target', 'critic_target']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
@@ -49,35 +52,51 @@ class DDPG(Agent):
         self.update_interval = algo_params['update_interval']
         # statistic dict
         self.statistic_dict.update({
-            'episode_return': [],
-            'episode_test_return': []
+            'cycle_return': [],
+            'cycle_success_rate': [],
+            'epoch_test_return': [],
+            'epoch_test_success_rate': []
         })
 
     def run(self, test=False, render=False, load_network_ep=None):
         if test:
-            num_episode = self.testing_episodes
             if load_network_ep is not None:
                 print("Loading network parameters...")
                 self._load_network(ep=load_network_ep)
             print("Start testing...")
         else:
-            num_episode = self.training_episodes
             print("Start training...")
 
-        for ep in range(num_episode):
-            ep_return = self._interact(render, test)
-            self.statistic_dict['episode_return'].append(ep_return)
-            print("Episode %i" % ep, "return %0.1f" % ep_return)
+        for epo in range(self.training_epochs):
+            for cyc in range(self.training_cycles):
+                cycle_return = 0
+                cycle_success = 0
+                for ep in range(self.training_episodes):
+                    ep_return = self._interact(render, test)
+                    cycle_return += ep_return
+                    if ep_return > -50:
+                        cycle_success += 1
 
-            if (ep % self.testing_gap == 0) and (ep != 0) and (not test):
-                ep_test_return = []
+                self.statistic_dict['cycle_return'].append(cycle_return / self.training_episodes)
+                self.statistic_dict['cycle_success_rate'].append(cycle_success / self.training_episodes)
+                print("Epoch %i" % epo, "Cycle %i" % cyc,
+                      "avg. return %0.1f" % (cycle_return/self.training_episodes),
+                      "success rate %0.1f" % (cycle_success/self.training_episodes))
+
+            if (epo % self.testing_gap == 0) and (epo != 0) and (not test):
+                test_return = 0
+                test_success = 0
                 for test_ep in range(self.testing_episodes):
-                    ep_test_return.append(self._interact(render, test=True))
-                self.statistic_dict['episode_test_return'].append(sum(ep_test_return)/self.testing_episodes)
-                print("Episode %i" % ep, "test return %0.1f" % (sum(ep_test_return)/self.testing_episodes))
+                    ep_test_return = self._interact(render, test=True)
+                    test_return += ep_test_return
+                    if ep_test_return > -50:
+                        test_success += 1
+                self.statistic_dict['epoch_test_return'].append(test_return / self.testing_episodes)
+                self.statistic_dict['epoch_test_success_rate'].append(test_success / self.testing_episodes)
+                print("Epoch %i" % epo, "test avg. return %0.1f" % (test_return / self.testing_episodes))
 
-            if (ep % self.saving_gap == 0) and (ep != 0) and (not test):
-                self._save_network(ep=ep)
+            if (epo % self.saving_gap == 0) and (epo != 0) and (not test):
+                self._save_network(ep=epo)
 
         if not test:
             print("Finished training")
@@ -92,6 +111,7 @@ class DDPG(Agent):
         obs = self.env.reset()
         ep_return = 0
         step = 0
+        new_episode = True
         # start a new episode
         while not done:
             if render:
@@ -100,17 +120,20 @@ class DDPG(Agent):
             new_obs, reward, done, info = self.env.step(action)
             ep_return += reward
             if not test:
-                self._remember(obs, action, new_obs, reward, 1 - int(done))
-                self.normalizer.store_history(new_obs)
+                self._remember(obs['state'], obs['desired_goal'], action,
+                               new_obs['state'], new_obs['achieved_goal'], reward, 1 - int(done),
+                               new_episode=new_episode)
+                self.normalizer.store_history(np.concatenate((new_obs['state'],
+                                                              new_obs['desired_goal']), axis=0))
                 self.normalizer.update_mean()
-                if (step % self.update_interval == 0) and (step != 0):
-                    self._learn()
             obs = new_obs
             step += 1
+            new_episode = False
+        self._learn()
         return ep_return
 
     def _select_action(self, obs, test=False):
-        inputs = self.normalizer(obs)
+        inputs = np.concatenate((obs['state'], obs['desired_goal']), axis=0)
         # evaluate
         if test:
             with T.no_grad():
@@ -129,6 +152,9 @@ class DDPG(Agent):
                 return np.clip(action + noise, -self.action_max, self.action_max)
 
     def _learn(self, steps=None):
+        if self.hindsight:
+            self.buffer.modify_episodes()
+        self.buffer.store_episodes()
         if len(self.buffer) < self.batch_size:
             return
         if steps is None:
@@ -143,11 +169,13 @@ class DDPG(Agent):
                 weights = T.ones(size=(self.batch_size, 1)).to(self.device)
                 inds = None
 
-            actor_inputs = self.normalizer(batch.state)
+            actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
+            actor_inputs = self.normalizer(actor_inputs)
             actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
             actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
             critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
-            actor_inputs_ = self.normalizer(batch.next_state)
+            actor_inputs_ = np.concatenate((batch.next_state, batch.desired_goal), axis=1)
+            actor_inputs_ = self.normalizer(actor_inputs_)
             actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)

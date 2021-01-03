@@ -69,13 +69,14 @@ class EpisodeWiseReplayBuffer(object):
         self.capacity = capacity
         self.memory = []
         self.position = 0
+        self.new_episode = False
         self.episodes = []
         self.ep_position = -1
         self.Transition = tr_namedtuple
 
-    def store_experience(self, new_episode=False, *args):
+    def store_experience(self, *args):
         # $new_episode is a boolean value
-        if new_episode:
+        if self.new_episode:
             self.episodes.append([])
             self.ep_position += 1
         self.episodes[self.ep_position].append(self.Transition(*args))
@@ -279,6 +280,7 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
         self.capacity = capacity
         self.memory = []
         self.mem_position = 0
+        self.new_episode = False
         self.episodes = []
         self.ep_position = -1
         self.Transition = tr_namedtuple
@@ -292,11 +294,8 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
         self.min_tree = MinSegmentTree(tree_capacity)
         self._max_priority = 1.0
 
-    def store_experience(self, new_episode=False, *args):
-        """When new_episode is True, create a new list to store data.
-        This can be used to separate data storage for purposes such as trajectory-wise relabelling.
-        """
-        if new_episode:
+    def store_experience(self, *args):
+        if self.new_episode:
             self.episodes.append([])
             self.ep_position += 1
         self.episodes[self.ep_position].append(self.Transition(*args))

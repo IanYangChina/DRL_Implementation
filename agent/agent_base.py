@@ -12,8 +12,7 @@ t_goal = namedtuple("transition", ('state', 'desired_goal', 'action', 'next_stat
 
 def mkdir(paths):
     for path in paths:
-        if not os.path.isdir(path):
-            os.mkdir(path)
+        os.makedirs(path, exist_ok=True)
 
 
 class Agent(object):
@@ -57,11 +56,6 @@ class Agent(object):
         else:
             self.goal_dim = 0
 
-        # training args
-        self.training_episodes = algo_params['training_episodes']
-        self.testing_episodes = algo_params['testing_episodes']
-        self.saving_gap = algo_params['saving_gap']
-
         # common args
         self.normalizer = Normalizer(self.state_dim+self.goal_dim,
                                      algo_params['init_input_means'], algo_params['init_input_vars'])
@@ -74,36 +68,15 @@ class Agent(object):
         self.network_dict = {}
         self.network_keys_to_save = None
         self.statistic_dict = {
+            # use lowercase characters
             'actor_loss': [],
             'critic_loss': [],
         }
 
     def run(self, render=False, test=False, load_network_ep=None):
-        if test:
-            num_episode = self.testing_episodes
-            print("Loading network parameters...")
-            assert load_network_ep is not None
-            self._load_network(ep=load_network_ep)
-            print("Start testing...")
-        else:
-            num_episode = self.training_episodes
-            print("Start training...")
+        raise NotImplementedError()
 
-        for ep in range(num_episode):
-            self._interact(ep, render, test, load_network_ep)
-
-            if (ep % self.saving_gap == 0) and (ep != 0) and (not test):
-                self._save_network(ep=ep)
-
-        if not test:
-            print("Finished training")
-            print("Saving statistics...")
-            self._save_statistics()
-            self._plot_statistics()
-        else:
-            print("Finished testing")
-
-    def _interact(self, ep, render=False, test=False, load_network_ep=None):
+    def _interact(self, render=False, test=False):
         raise NotImplementedError()
 
     def _select_action(self, obs, test=False):
@@ -111,7 +84,8 @@ class Agent(object):
 
     def _remember(self, *args, new_episode=False):
         if self.goal_conditioned:
-            self.buffer.store_experience(new_episode=new_episode, *args)
+            self.buffer.new_episode = new_episode
+            self.buffer.store_experience(*args)
         else:
             self.buffer.store_experience(*args)
 
@@ -151,10 +125,9 @@ class Agent(object):
         for key in keys:
             self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+'.pt'))
 
-    def _save_statistics(self, keys=None):
+    def _save_statistics(self):
         np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
         np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
-        # todo: test json.dump
         json.dump(self.statistic_dict, open(os.path.join(self.data_path, 'statistics.json'), 'w'))
     
     def _plot_statistics(self, keys=None, x_labels=None, y_labels=None, window=5):
@@ -176,12 +149,12 @@ class Agent(object):
             for key in list(self.statistic_dict.keys()):
                 if 'loss' in key:
                     label = 'Optimization step'
-                elif 'return' in key:
-                    label = 'Episode'
-                elif 'success' in key:
-                    label = 'Episode'
+                elif 'cycle' in key:
+                    label = 'Cycle'
+                elif 'epoch' in key:
+                    label = 'Epoch'
                 else:
-                    label = key
+                    label = 'Episode'
                 x_labels.update({key: label})
         
         if keys is None:

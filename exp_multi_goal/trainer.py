@@ -53,7 +53,6 @@ class Trainer(object):
             for cyc in range(CYCLE):
                 ep = 0
                 cycle_return = 0
-                cycle_timesteps = 0
                 cycle_successes = 0
                 while ep < EPISODE:
                     done = False
@@ -64,7 +63,6 @@ class Trainer(object):
                     while not done:
                         if self.render:
                             self.env.render()
-                        cycle_timesteps += 1
                         action = self.agent.select_action(obs['state'], obs['desired_goal'], test)
                         new_obs, reward, done, info = self.env.step(action)
                         ep_return += reward

@@ -1,5 +1,5 @@
 from agent.ddpg import DDPG
-from agent.ddpg_her_continuous import HindsightDDPGAgent
+from agent.ddpg_her import DDPGHer
 from agent.dqn_atari import DQN
 from agent.dqn_her_discrete import HindsightDQN
 from agent.option_critic_discrete import OptionCritic
@@ -11,7 +11,7 @@ from agent.sac_her_continuous import HindsightSACAgent
 
 agents = {
     'ddpg': DDPG,
-    'ddpg_her': HindsightDDPGAgent,
+    'ddpg_her': DDPGHer,
     'dqn_atari': DQN,
     'dqn_her': HindsightDQN,
     'option_critic': OptionCritic,
