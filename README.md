@@ -1,10 +1,14 @@
 ## DRL_Implementation
-- This repository will be filled with codes reproducing some DRL algos I'm interested in.
-- Most algorithms remain untested because my PC is occupied by my current research experiments.
-- Language: Python-3.6
-- Main library: PyTorch-1.3.0, Mujoco-py-2.0.2.8, Gym-0.15.3  
-
 #### Current status: under development  
+#### Important: the project is undergoing an code structure overhaul, use with caution
+
+#### Introduction
+- This repository is a pytorch-based implementation of modern DRL algorithms, designed to be reusable for as many 
+Gym-like training environments as possible
+- The package is under-development, plan to release the first version before April 2021.
+- Language: Python >= 3.6
+- Main library: PyTorch-1.3.0
+- Tested environments: Gym, Pybullet-gym, Pybullet-multigoal-gym
 
 #### Algorithms: Flat
 - [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
@@ -30,7 +34,8 @@
 #### Environments
 - [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal, Customized)
 - [X] OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous, Official)
-- [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics Multigoal Pybullet Migration) (Continuous, Official)
+- [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics 
+Multigoal Pybullet Migration) (Continuous, Official)
 - [ ] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous, Customized)
 
 #### Some result figures

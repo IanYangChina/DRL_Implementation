@@ -1,10 +1,10 @@
 import os
 import plot
 import pybullet_multigoal_gym as pgm
-from agent import GoalConditionedDDPG
+from agent import GoalConditionedSAC
 algo_params = {
     'hindsight': True,
-    'prioritised': False,
+    'prioritised': True,
     'memory_capacity': int(1e6),
     'learning_rate': 0.001,
     'update_interval': 1,
@@ -12,11 +12,11 @@ algo_params = {
     'optimization_steps': 40,
     'tau': 0.05,
     'discount_factor': 0.98,
-    'clip_value': 50,
     'discard_time_limit': True,
 
-    'random_action_chance': 0.2,
-    'noise_deviation': 0.05,
+    'alpha': 0.5,
+    'actor_update_interval': 2,
+    'critic_target_update_interval': 2,
 
     'training_epochs': 51,
     'training_cycles': 50,
@@ -29,7 +29,7 @@ seeds = [11, 22, 33, 44, 55, 66]
 seed_returns = []
 seed_success_rates = []
 path = os.path.dirname(os.path.realpath(__file__))
-path = os.path.join(path, 'Reach_HER')
+path = os.path.join(path, 'Reach_PHER')
 
 for seed in seeds:
 
@@ -37,7 +37,7 @@ for seed in seeds:
 
     seed_path = path + '/seed'+str(seed)
 
-    agent = GoalConditionedDDPG(algo_params=algo_params, env=env, path=seed_path, seed=seed)
+    agent = GoalConditionedSAC(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
     seed_returns.append(agent.statistic_dict['epoch_test_return'])
     seed_success_rates.append(agent.statistic_dict['epoch_test_success_rate'])

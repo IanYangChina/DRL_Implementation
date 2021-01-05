@@ -13,9 +13,6 @@ algo_params = {
     'discount_factor': 0.98,
     'discard_time_limit': True,
 
-    'random_action_chance': 0.2,
-    'noise_deviation': 0.05,
-
     'training_episodes': 151,
     'testing_gap': 10,
     'testing_episodes': 10,
@@ -24,7 +21,6 @@ algo_params = {
 seeds = [11, 22, 33, 44, 55, 66]
 seed_returns = []
 path = os.path.dirname(os.path.realpath(__file__))
-
 for seed in seeds:
 
     env = pybullet_envs.make("HalfCheetahBulletEnv-v0")

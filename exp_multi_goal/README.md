@@ -11,7 +11,7 @@ Unfortunately, it seems that mujoco is hard to be installed on Windows systems, 
 page](https://github.com/openai/mujoco-py/issues/253). However, I still suggest you to run these codes on Linux systems.
 
 The [pybullet-multigoal-gym](https://github.com/IanYangChina/pybullet_multigoal_gym) environment is a migration of the open ai gym multigoal environment, developed by the author
-of this repo. It is free as it is based on Pybullet. You will need it to run the pybullet gym experiments.
+of this repo. It is free as it is based on Pybullet. You will need it to run the pybullet experiments.
 
 #### Some notes I made when I was implementing HER:  
 * The original paper uses multiple cpu to collect data, however, this implementation uses single cpu. Multi-cpu might be 
@@ -28,10 +28,12 @@ performed.
 target network is updated softly with tau=0.05.  
 * Adam is used for learning with a learning rate of 0.001, discount factor is 0.98, target value is clipped to 
 [-1/(1-0.98), 0], that is [-50, 0]. I think this is based on the 50 time steps they set for each episode, in which at 
-most an agent could gain -50 return.  
+most an agent could gain -50 return. **The SAC agent doesn't need value clip.**
 * For exploration, they randomly select action from uniform distribution with 20% chance; and with 80% chance, they 
-add normal noise into increments along each axes with standard deviation equal to 5% of the max bound.  
+add normal noise into increments along each axes with standard deviation equal to 5% of the max bound. **The SAC agent
+doesn't need a behavioural policy.**
 
+* Currently only the RANDOM replay strategy is implemented.
 * The goal-conditioned sac agent doesn't need value clipping.
 * Prioritised replay supported.
     

@@ -62,6 +62,7 @@ class Agent(object):
         self.learning_rate = algo_params['learning_rate']
         self.batch_size = algo_params['batch_size']
         self.optimizer_steps = algo_params['optimization_steps']
+        self.step_count = 0
         self.gamma = algo_params['discount_factor']
         self.discard_time_limit = algo_params['discard_time_limit']
         self.tau = algo_params['tau']

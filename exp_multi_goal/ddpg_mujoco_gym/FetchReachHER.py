@@ -1,10 +1,10 @@
 import os
 import plot
 import gym
-from agent import DDPGHer
+from agent import GoalConditionedDDPG
 algo_params = {
     'hindsight': True,
-    'prioritised': False,
+    'prioritised': True,
     'memory_capacity': int(1e6),
     'learning_rate': 0.001,
     'update_interval': 1,
@@ -28,7 +28,7 @@ seeds = [11, 22, 33, 44, 55, 66]
 seed_returns = []
 seed_success_rates = []
 path = os.path.dirname(os.path.realpath(__file__))
-path = os.path.join(path, 'Reach_HER')
+path = os.path.join(path, 'Reach_PHER')
 
 for seed in seeds:
 
@@ -36,7 +36,7 @@ for seed in seeds:
 
     seed_path = path + '/seed'+str(seed)
 
-    agent = DDPGHer(algo_params=algo_params, env=env, path=seed_path, seed=seed)
+    agent = GoalConditionedDDPG(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
 
     seed_returns.append(agent.statistic_dict['epoch_test_return'])
