@@ -40,7 +40,7 @@ class SAC(Agent):
             'alpha': algo_params['alpha'],
             'log_alpha': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
-        self.network_keys_to_save = ['actor_target', 'critic_1_target']
+        self.network_keys_to_save = ['actor', 'critic_1_target']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
         self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.learning_rate)
         self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.learning_rate)

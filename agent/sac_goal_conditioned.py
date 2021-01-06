@@ -44,7 +44,7 @@ class GoalConditionedSAC(Agent):
             'alpha': algo_params['alpha'],
             'log_alpha': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
-        self.network_keys_to_save = ['actor_target', 'critic_target']
+        self.network_keys_to_save = ['actor', 'critic_1_target']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
         self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
         self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.learning_rate)

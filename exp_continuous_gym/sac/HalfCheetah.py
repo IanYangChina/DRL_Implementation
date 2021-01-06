@@ -34,7 +34,7 @@ for seed in seeds:
 
     agent = SAC(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    seed_returns.append(agent.statistic_dict['ep_test_return'])
+    seed_returns.append(agent.statistic_dict['episode_test_return'])
 
 return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
                                                file_name=os.path.join(path, 'return_statistic.json'))
