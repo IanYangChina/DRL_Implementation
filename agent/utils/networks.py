@@ -47,7 +47,7 @@ class StochasticActor(nn.Module):
         log_std = self.log_std(x)
         log_std = T.clamp(log_std, self.log_std_min, self.log_std_max)
         return mean, log_std
-
+    
     def get_action(self, inputs, epsilon=1e-6, mean_pi=False, probs=False):
         mean, log_std = self(inputs)
         if mean_pi:

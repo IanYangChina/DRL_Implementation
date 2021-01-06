@@ -97,7 +97,6 @@ class TD3(Agent):
         obs = self.env.reset()
         ep_return = 0
         step = 0
-        self.exploration_strategy.reset()
         # start a new episode
         while not done:
             if render:
@@ -156,7 +155,7 @@ class TD3(Agent):
                 done = done * 0 + 1
 
             with T.no_grad():
-                actions_, log_probs_ = self.network_dict['actor_target'].get_action(actor_inputs_, probs=True)
+                actions_ = self.network_dict['actor_target'](actor_inputs_)
                 # add noise
                 actions_ += T.tensor(self.target_noise(), dtype=T.float32).to(self.device)
                 critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
@@ -173,7 +172,7 @@ class TD3(Agent):
 
             if self.prioritised:
                 assert inds is not None
-                self.buffer.update_priority(inds, np.abs(critic_loss.cpu().detach().numpy()))
+                self.buffer.update_priority(inds, np.abs(critic_loss_1.cpu().detach().numpy()))
 
             self.critic_2_optimizer.zero_grad()
             value_estimate_2 = self.network_dict['critic_2'](critic_inputs)

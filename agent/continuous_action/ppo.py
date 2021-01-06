@@ -25,8 +25,10 @@ class PPO(Agent):
         self.testing_episodes = algo_params['testing_episodes']
         self.saving_gap = algo_params['saving_gap']
 
-        # ppo does not use prioritised replay
+        # redundant args for compatibility with agent base class (not used by PPO)
         algo_params['prioritised'] = False
+        algo_params['discard_time_limit'] = False
+        algo_params['tau'] = 1.0
         if transition_tuple is None:
             # ppo needs to store historical log probabilities in the buffer
             transition_tuple = namedtuple("transition", ('state', 'action', 'log_prob', 'next_state', 'reward', 'done'))
@@ -39,7 +41,7 @@ class PPO(Agent):
         self.network_dict.update({
             'actor': StochasticActor(self.state_dim, self.action_dim, log_std_min=-6, log_std_max=1).to(self.device),
             'old_actor': StochasticActor(self.state_dim, self.action_dim, log_std_min=-6, log_std_max=1).to(self.device),
-            'critic': Critic(self.state_dim + self.action_dim, 1).to(self.device),
+            'critic': Critic(self.state_dim, 1).to(self.device),
         })
         self.network_keys_to_save = ['actor', 'critic']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
@@ -47,13 +49,11 @@ class PPO(Agent):
         # ppo args
         self.clip_epsilon = algo_params['clip_epsilon']
         self.value_loss_weight = algo_params['value_loss_weight']
-        self.return_normalization = algo_params['return_normalization']
         self.GAE_lambda = algo_params['GAE_lambda']
+        self.entropy_loss_weight = algo_params['entropy_loss_weight']
         # training args
         # ppo updates network when a batch is available, and discards the data after optimization step
         self.update_interval = self.batch_size
-        self.actor_update_interval = algo_params['actor_update_interval']
-        self.critic_target_update_interval = algo_params['critic_target_update_interval']
         # statistic dict
         self.statistic_dict.update({
             'episode_return': [],
@@ -122,10 +122,13 @@ class PPO(Agent):
         inputs = self.normalizer(obs)
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         if test:
-            return self.network_dict['old_actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
+            action = self.network_dict['old_actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
+            return np.clip(action, -self.action_max, self.action_max), None
         else:
             action, probs = self.network_dict['old_actor'].get_action(inputs, probs=True)
-            return action[0].detach().cpu().numpy(), probs[0].detach().cpu().numpy()
+            action = action[0].detach().cpu().numpy()
+            probs = probs[0].detach().cpu().numpy()
+            return np.clip(action, -self.action_max, self.action_max), probs
 
     def _learn(self, steps=None):
         if len(self.buffer) < self.batch_size:
@@ -133,6 +136,7 @@ class PPO(Agent):
         if steps is None:
             steps = self.optimizer_steps
 
+        # todo: change the sample method
         batch = self.buffer.full_memory
 
         actor_inputs = self.normalizer(batch.state)
@@ -144,49 +148,56 @@ class PPO(Agent):
         rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
         done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
 
-        # compute N-step returns
-        returns = []
+        # compute N-step returns & Generalized Advantage Estimator
+        #   see https://arxiv.org/pdf/2006.05990.pdf Appendix B.2
+        reversed_rewards = rewards.flip(0)
+        reversed_next_states = actor_inputs_.flip(0)
+        reversed_done = done.flip(0)
+        n_step_returns = []
+        GAE_returns = []
         discounted_return = 0
-        rewards = rewards.flip(0)
-        done = done.flip(0)
-        for i in range(rewards.shape[0]):
+        cumulated_step_count = 1
+        last_next_state = reversed_next_states[0]
+        last_next_state_value = self.network_dict['critic'](last_next_state)
+        discounted_GAE_return = 0
+        for i in range(reversed_rewards.shape[0]):
             # done flags are stored as 0/1 integers, where 0 represents a done state
-            if done[i] == 0:
+            # reset discounted return and cumulated steps when encounter a [True] done flag
+            # recalculate the last next state value
+            if reversed_done[i] == 0:
                 discounted_return = 0
-            discounted_return = rewards[i] + self.gamma * discounted_return
+                cumulated_step_count = 1
+                last_next_state_value = self.network_dict['critic'](reversed_next_states[i])
+                discounted_GAE_return = 0
+            discounted_return = reversed_rewards[i] + self.gamma * discounted_return
+            # add a discounted next state value to the n-step return
+            discount_rate = np.power(self.gamma, cumulated_step_count)
+            n_step_return = discounted_return + discount_rate*last_next_state_value.detach()
+            cumulated_step_count += 1
             # insert n-step returns top-down
-            returns.insert(0, discounted_return)
-        returns = T.tensor(returns, dtype=T.float32).unsqueeze(1).to(self.device)
-        if self.return_normalization:
-            returns = (returns - returns.mean()) / (returns.std() + 1e-5)
+            n_step_returns.insert(0, n_step_return)
+            # calculate GAE value
+            GAE_discount_rate = np.power(self.GAE_lambda, cumulated_step_count-1)
+            discounted_GAE_return += GAE_discount_rate * n_step_return
+            GAE_returns.insert(0, (1-self.GAE_lambda)*discounted_GAE_return)
+
+        n_step_returns = T.tensor(n_step_returns, dtype=T.float32).unsqueeze(1).to(self.device)
+        GAE_returns = T.tensor(GAE_returns, dtype=T.float32).unsqueeze(1).to(self.device)
 
         for step in range(steps):
             log_probs_, entropy = self.network_dict['actor'].get_log_probs(actor_inputs, actions)
             state_values = self.network_dict['critic'](actor_inputs)
-            next_state_values = self.network_dict['critic'](actor_inputs_)
 
             ratio = T.exp(log_probs_ - log_probs.detach())
-            # no done flag trick
-            returns = returns + self.gamma * next_state_values.detach()
-            advantages = returns - state_values.detach()
-
-            # compute general advantage esimator
-            GAE = []
-            gae_t = 0
-            advantages.flip(0)
-            for i in range(rewards.shape[0]):
-                if done[i] == 0:
-                    gae_t = 0
-                gae_t = advantages[i] + self.GAE_lambda * gae_t
-                GAE.insert(0, (1-self.GAE_lambda)*gae_t)
-            GAE = T.tensor(GAE, dtype=T.float32).unsqueeze(1).to(self.device)
+            GAE = GAE_returns - state_values.detach()
 
             L_clip = T.min(
                 ratio*GAE,
                 T.clamp(ratio, 1-self.clip_epsilon, 1+self.clip_epsilon)*GAE
             )
             loss = -(L_clip -
-                     self.value_loss_weight*F.mse_loss(state_values, returns))
+                     self.value_loss_weight*F.mse_loss(state_values, n_step_returns) +
+                     self.entropy_loss_weight*entropy.mean())
 
             self.actor_optimizer.zero_grad()
             self.critic_optimizer.zero_grad()
@@ -194,7 +205,7 @@ class PPO(Agent):
             self.actor_optimizer.step()
             self.critic_optimizer.step()
 
-            self.statistic_dict['critic_loss'].append(F.mse_loss(state_values, returns).detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(F.mse_loss(state_values, n_step_returns).detach().mean().cpu().numpy().item())
             self.statistic_dict['actor_loss'].append(loss.detach().mean().cpu().numpy().item())
             self.statistic_dict['clipped_loss'].append(L_clip.detach().mean().cpu().numpy().item())
             self.statistic_dict['policy_entropy'].append(-log_probs_.detach().mean().cpu().numpy().item())
