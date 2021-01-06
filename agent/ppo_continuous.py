@@ -65,7 +65,7 @@ class PPOAgent(object):
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         if log_probs:
             action, probs = self.old_actor.get_action(inputs, probs=True)
-            return action.detach().cpu().numpy(), probs.detach().cpu().numpy()
+            return action[0].detach().cpu().numpy(), probs[0].detach().cpu().numpy()
         else:
             return self.old_actor.get_action(inputs, mean_pi=test).detach().cpu().numpy()
 

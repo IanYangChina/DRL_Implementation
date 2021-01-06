@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.utils.networks import StochasticActor, Critic
 from agent.agent_base import Agent
-from agent.utils.exploration_strategy import ConstantChance
 
 
 class SAC(Agent):
@@ -172,7 +171,7 @@ class SAC(Agent):
             (critic_loss_2 * weights).mean().backward()
             self.critic_2_optimizer.step()
 
-            self.statistic_dict['critic_loss'].append(critic_loss.detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
 
             if self.step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
@@ -195,7 +194,7 @@ class SAC(Agent):
                 self.network_dict['alpha'] = self.network_dict['log_alpha'].exp()
 
                 self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
-                self.statistics['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
-                self.statistics['policy_entropy'].append(-new_log_probs.detach().mean().cpu().numpy().item())
+                self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
+                self.statistic_dict['policy_entropy'].append(-new_log_probs.detach().mean().cpu().numpy().item())
 
             self.step_count += 1
