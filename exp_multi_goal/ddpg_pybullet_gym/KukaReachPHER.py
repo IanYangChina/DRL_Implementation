@@ -1,6 +1,6 @@
 import os
 import plot
-import pybullet_multigoal_gym as pgm
+import pybullet_multigoal_gym as pmg
 from agent import GoalConditionedDDPG
 algo_params = {
     'hindsight': True,
@@ -33,7 +33,7 @@ path = os.path.join(path, 'Reach_HER')
 
 for seed in seeds:
 
-    env = pgm.make("KukaReachSparseEnv-v0")
+    env = pmg.make("KukaReachSparseEnv-v0")
 
     seed_path = path + '/seed'+str(seed)
 

@@ -3,7 +3,7 @@ import gym
 import numpy as np
 from copy import deepcopy as dcp
 from scipy.misc import imresize  # deprecated after scipy 1.3.0
-from agent.dqn_atari import DQN
+from agent.discrete_action.dqn_atari import DQN
 from plot import smoothed_plot
 
 

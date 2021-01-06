@@ -3,7 +3,7 @@ import numpy as np
 from plot import smoothed_plot
 from copy import deepcopy as dcp
 from collections import namedtuple
-from agent.option_critic_discrete import OptionCritic
+from agent.discrete_action.option_critic_discrete import OptionCritic
 
 
 class Trainer(object):

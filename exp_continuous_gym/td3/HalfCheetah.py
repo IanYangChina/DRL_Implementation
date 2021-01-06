@@ -1,18 +1,19 @@
 import os
 import plot
 import pybullet_envs
-from agent import PPO
+from agent import TD3
 algo_params = {
+    'prioritised': False,
     'memory_capacity': int(1e6),
     'learning_rate': 0.001,
     'batch_size': 128,
-    'optimization_steps': 5,
+    'optimization_steps': 1,
+    'tau': 0.005,
     'discount_factor': 0.98,
+    'discard_time_limit': True,
 
-    'clip_epsilon': 0.25,
-    'value_loss_weight': 0.5,
-    'return_normalization': False,
-    'GAE_lambda': 0.9,
+    'update_interval': 50,
+    'actor_update_interval': 2,
 
     'training_episodes': 151,
     'testing_gap': 10,
@@ -29,7 +30,7 @@ for seed in seeds:
 
     seed_path = path + '/seed'+str(seed)
 
-    agent = PPO(algo_params=algo_params, env=env, path=seed_path, seed=seed)
+    agent = TD3(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
     seed_returns.append(agent.statistic_dict['episode_test_return'])
 

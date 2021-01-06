@@ -2,7 +2,7 @@ import os
 import numpy as np
 from plot import smoothed_plot, smoothed_plot_multi_line
 from copy import deepcopy as dcp
-from agent.option_dqn_her_discrete import OptionDQN
+from agent.discrete_action.option_dqn_her_discrete import OptionDQN
 from agent.utils.demonstrator import Demonstrator
 
 
