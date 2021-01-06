@@ -34,8 +34,7 @@ class GoalConditionedSAC(Agent):
                                                  seed=seed)
         # torch
         self.network_dict.update({
-            'actor': StochasticActor(self.state_dim + self.goal_dim, self.action_dim,
-                                     log_std_min=-6, log_std_max=1).to(self.device),
+            'actor': StochasticActor(self.state_dim + self.goal_dim, self.action_dim, log_std_min=-6, log_std_max=1).to(self.device),
             'critic_1': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_1_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_2': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
@@ -51,10 +50,6 @@ class GoalConditionedSAC(Agent):
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         self.target_entropy = -self.action_dim
         self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.learning_rate)
-        # training args
-        self.update_interval = algo_params['update_interval']
-        self.actor_update_interval = algo_params['actor_update_interval']
-        self.critic_target_update_interval = algo_params['critic_target_update_interval']
         # training args
         self.update_interval = algo_params['update_interval']
         self.actor_update_interval = algo_params['actor_update_interval']
