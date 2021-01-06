@@ -97,7 +97,11 @@ class ConstantChance(object):
 
 class OUNoise(object):
     # https://github.com/rll/rllab/blob/master/rllab/exploration_strategies/ou_strategy.py
-    def __init__(self, action_dim, mu=0, theta=0.15, sigma=0.2):
+    def __init__(self, action_dim, mu=0, theta=0.15, sigma=0.2, rng=None):
+        if rng is None:
+            self.rng = np.random.default_rng(seed=0)
+        else:
+            self.rng = rng
         self.action_dim = action_dim
         self.mu = mu
         self.theta = theta
@@ -110,6 +114,6 @@ class OUNoise(object):
 
     def noise(self):
         x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * nr.randn(len(x))
+        dx = self.theta * (self.mu - x) + self.sigma * self.rng.standard_normal(len(x))
         self.state = x + dx
         return self.state
