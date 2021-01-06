@@ -2,9 +2,8 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from agent.utils.networks import Actor, Critic
+from agent.utils.networks import StochasticActor, Critic
 from agent.agent_base import Agent
-from agent.utils.exploration_strategy import ConstantChance
 
 
 class GoalConditionedSAC(Agent):
@@ -44,22 +43,30 @@ class GoalConditionedSAC(Agent):
             'alpha': algo_params['alpha'],
             'log_alpha': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
-        self.network_keys_to_save = ['actor', 'critic_1_target']
+        self.network_keys_to_save = ['actor_target', 'critic_1_target']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
-        self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
-        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.learning_rate)
-        self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
-        # behavioural policy args (exploration)
-        self.exploration_strategy = ConstantChance(chance=algo_params['random_action_chance'], rng=self.rng)
-        self.noise_deviation = algo_params['noise_deviation']
+        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.learning_rate)
+        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.learning_rate)
+        self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'], tau=1)
+        self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
+        self.target_entropy = -self.action_dim
+        self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.learning_rate)
         # training args
         self.update_interval = algo_params['update_interval']
+        self.actor_update_interval = algo_params['actor_update_interval']
+        self.critic_target_update_interval = algo_params['critic_target_update_interval']
+        # training args
+        self.update_interval = algo_params['update_interval']
+        self.actor_update_interval = algo_params['actor_update_interval']
+        self.critic_target_update_interval = algo_params['critic_target_update_interval']
         # statistic dict
         self.statistic_dict.update({
             'cycle_return': [],
             'cycle_success_rate': [],
             'epoch_test_return': [],
-            'epoch_test_success_rate': []
+            'epoch_test_success_rate': [],
+            'alpha': [],
+            'policy_entropy': [],
         })
 
     def run(self, test=False, render=False, load_network_ep=None):
@@ -200,7 +207,7 @@ class GoalConditionedSAC(Agent):
             (critic_loss_2 * weights).mean().backward()
             self.critic_2_optimizer.step()
 
-            self.statistic_dict['critic_loss'].append(critic_loss.detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
 
             if self.step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
@@ -223,7 +230,7 @@ class GoalConditionedSAC(Agent):
                 self.network_dict['alpha'] = self.network_dict['log_alpha'].exp()
 
                 self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
-                self.statistics['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
-                self.statistics['policy_entropy'].append(-new_log_probs.detach().mean().cpu().numpy().item())
+                self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
+                self.statistic_dict['policy_entropy'].append(-new_log_probs.detach().mean().cpu().numpy().item())
 
             self.step_count += 1

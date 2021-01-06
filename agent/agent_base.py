@@ -148,7 +148,7 @@ class Agent(object):
         if x_labels is None:
             x_labels = {}
             for key in list(self.statistic_dict.keys()):
-                if 'loss' in key:
+                if ('loss' in key) or ('alpha' in key) or ('entropy' in key):
                     label = 'Optimization step'
                 elif 'cycle' in key:
                     label = 'Cycle'

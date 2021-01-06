@@ -62,7 +62,7 @@ class StochasticActor(nn.Module):
             if action.shape == (self.action_dim,):
                 action = action.reshape((1, self.action_dim))
             log_probs = (mu.log_prob(z) - T.log(1 - action.pow(2) + epsilon)).sum(1, keepdim=True)
-            return action[0], log_probs[0]
+            return action, log_probs
 
     def get_log_probs(self, inputs, actions):
         mean, log_std = self(inputs)
