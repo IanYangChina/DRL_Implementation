@@ -48,9 +48,9 @@ class TD3(Agent):
         self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         # behavioural policy args (exploration)
-        self.warmup_step = 2500
-        self.target_noise = 0.2
-        self.noise_clip = 0.5
+        self.warmup_step = algo_params['warmup_step']
+        self.target_noise = algo_params['target_noise']
+        self.noise_clip = algo_params['noise_clip']
         self.exploration_strategy = GaussianNoise(self.action_dim, mu=0, sigma=0.1)
         # training args
         self.update_interval = algo_params['update_interval']
@@ -111,8 +111,9 @@ class TD3(Agent):
             ep_return += reward
             if not test:
                 self._remember(obs, action, new_obs, reward, 1 - int(done))
-                # self.normalizer.store_history(new_obs)
-                # self.normalizer.update_mean()
+                if self.observation_normalization:
+                    self.normalizer.store_history(new_obs)
+                    self.normalizer.update_mean()
                 if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                     self._learn()
             obs = new_obs
@@ -120,7 +121,7 @@ class TD3(Agent):
         return ep_return
 
     def _select_action(self, obs, test=False):
-        inputs = self.normalizer(obs)
+        obs = self.normalizer(obs)
         with T.no_grad():
             inputs = T.tensor(obs, dtype=T.float).to(self.device)
             action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
@@ -148,11 +149,11 @@ class TD3(Agent):
                 inds = None
 
             actor_inputs = self.normalizer(batch.state)
-            actor_inputs = T.tensor(batch.state, dtype=T.float32).to(self.device)
+            actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
             actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
             critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
             actor_inputs_ = self.normalizer(batch.next_state)
-            actor_inputs_ = T.tensor(batch.next_state, dtype=T.float32).to(self.device)
+            actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
 

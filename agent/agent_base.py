@@ -58,8 +58,10 @@ class Agent(object):
             self.goal_dim = 0
 
         # common args
+        self.observation_normalization = algo_params['observation_normalization']
         self.normalizer = Normalizer(self.state_dim+self.goal_dim,
-                                     algo_params['init_input_means'], algo_params['init_input_vars'])
+                                     algo_params['init_input_means'], algo_params['init_input_vars'],
+                                     activated=self.observation_normalization)
         self.actor_learning_rate = algo_params['actor_learning_rate']
         self.critic_learning_rate = algo_params['critic_learning_rate']
         self.batch_size = algo_params['batch_size']

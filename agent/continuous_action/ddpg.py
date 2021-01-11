@@ -44,9 +44,9 @@ class DDPG(Agent):
         self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
         # behavioural policy args (exploration)
-        self.exploration_strategy = OUNoise(self.action_dim, rng=self.rng)
-        # self.exploration_strategy = GaussianNoise(self.action_dim, mu=0, sigma=0.5)
+        self.exploration_strategy = GaussianNoise(self.action_dim, sigma=0.1)
         # training args
+        self.warmup_step = algo_params['warmup_step']
         self.update_interval = algo_params['update_interval']
         # statistic dict
         self.statistic_dict.update({
@@ -92,28 +92,32 @@ class DDPG(Agent):
         done = False
         obs = self.env.reset()
         ep_return = 0
-        self.exploration_strategy.reset()
+        # self.exploration_strategy.reset()
         # start a new episode
         while not done:
             if render:
                 self.env.render()
-            action = self._select_action(obs, test=test)
+            if self.env_step_count < self.warmup_step:
+                action = self.env.action_space.sample()
+            else:
+                action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
             ep_return += reward
             if not test:
                 self._remember(obs, action, new_obs, reward, 1 - int(done))
-                self.normalizer.store_history(new_obs)
-                self.normalizer.update_mean()
-                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count != 0):
+                if self.observation_normalization:
+                    self.normalizer.store_history(new_obs)
+                    self.normalizer.update_mean()
+                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                     self._learn()
             obs = new_obs
             self.env_step_count += 1
         return ep_return
 
     def _select_action(self, obs, test=False):
-        inputs = self.normalizer(obs)
+        obs = self.normalizer(obs)
         with T.no_grad():
-            inputs = T.tensor(inputs, dtype=T.float).to(self.device)
+            inputs = T.tensor(obs, dtype=T.float).to(self.device)
             action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
         if test:
             # evaluate

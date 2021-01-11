@@ -13,6 +13,7 @@ algo_params = {
     'tau': 0.005,
     'discount_factor': 0.98,
     'discard_time_limit': True,
+    'observation_normalization': False,
 
     'alpha': 0.5,
     'actor_update_interval': 2,
