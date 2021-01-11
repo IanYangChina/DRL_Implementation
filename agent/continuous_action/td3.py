@@ -48,11 +48,11 @@ class TD3(Agent):
         self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         # behavioural policy args (exploration)
-        self.warmup_step = algo_params['warmup_step']
-        self.target_noise = algo_params['target_noise']
-        self.noise_clip = algo_params['noise_clip']
         self.exploration_strategy = GaussianNoise(self.action_dim, mu=0, sigma=0.1)
         # training args
+        self.target_noise = algo_params['target_noise']
+        self.noise_clip = algo_params['noise_clip']
+        self.warmup_step = algo_params['warmup_step']
         self.update_interval = algo_params['update_interval']
         self.actor_update_interval = algo_params['actor_update_interval']
         # statistic dict

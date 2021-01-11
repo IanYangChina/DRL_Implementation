@@ -49,6 +49,7 @@ class SAC(Agent):
         self.target_entropy = -self.action_dim
         self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.actor_learning_rate)
         # training args
+        self.warmup_step = algo_params['warmup_step']
         self.update_interval = algo_params['update_interval']
         self.actor_update_interval = algo_params['actor_update_interval']
         self.critic_target_update_interval = algo_params['critic_target_update_interval']
@@ -102,14 +103,18 @@ class SAC(Agent):
         while not done:
             if render:
                 self.env.render()
-            action = self._select_action(obs, test=test)
+            if self.env_step_count < self.warmup_step:
+                action = self.env.action_space.sample()
+            else:
+                action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
             ep_return += reward
             if not test:
                 self._remember(obs, action, new_obs, reward, 1 - int(done))
-                self.normalizer.store_history(new_obs)
-                self.normalizer.update_mean()
-                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count != 0):
+                if self.observation_normalization:
+                    self.normalizer.store_history(new_obs)
+                    self.normalizer.update_mean()
+                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                     self._learn()
             obs = new_obs
             self.env_step_count += 1
