@@ -97,7 +97,7 @@ class ConstantChance(object):
 
 class OUNoise(object):
     # https://github.com/rll/rllab/blob/master/rllab/exploration_strategies/ou_strategy.py
-    def __init__(self, action_dim, mu=0, theta=0.15, sigma=0.2, rng=None):
+    def __init__(self, action_dim, mu=0, theta=0.2, sigma=1.0, rng=None):
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:

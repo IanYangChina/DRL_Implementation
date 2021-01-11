@@ -4,17 +4,18 @@ import pybullet_envs
 from agent import PPO
 algo_params = {
     'memory_capacity': int(1e6),
-    'learning_rate': 0.001,
-    'batch_size': 128,
+    'actor_learning_rate': 0.0001,
+    'critic_learning_rate': 0.0001,
+    'batch_size': 64,
     'optimization_steps': 3,
     'discount_factor': 0.98,
 
-    'clip_epsilon': 0.25,
+    'clip_epsilon': 0.20,
     'value_loss_weight': 0.5,
-    'GAE_lambda': 0.9,
+    'GAE_lambda': 0.99,
     'entropy_loss_weight': 0.01,
 
-    'training_episodes': 101,
+    'training_episodes': 301,
     'testing_gap': 10,
     'testing_episodes': 10,
     'saving_gap': 50,

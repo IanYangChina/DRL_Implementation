@@ -16,6 +16,7 @@ class PPO(Agent):
         algo_params.update({'state_dim': obs.shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
+                            'action_scaling': self.env.action_space.high[0],
                             'init_input_means': None,
                             'init_input_vars': None
                             })
@@ -39,13 +40,13 @@ class PPO(Agent):
                                    seed=seed)
         # torch
         self.network_dict.update({
-            'actor': StochasticActor(self.state_dim, self.action_dim, log_std_min=-6, log_std_max=1).to(self.device),
-            'old_actor': StochasticActor(self.state_dim, self.action_dim, log_std_min=-6, log_std_max=1).to(self.device),
+            'actor': StochasticActor(self.state_dim, self.action_dim, log_std_min=-6, log_std_max=1, action_scaling=self.action_scaling).to(self.device),
+            'old_actor': StochasticActor(self.state_dim, self.action_dim, log_std_min=-6, log_std_max=1, action_scaling=self.action_scaling).to(self.device),
             'critic': Critic(self.state_dim, 1).to(self.device),
         })
         self.network_keys_to_save = ['actor', 'critic']
-        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
-        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.learning_rate)
+        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
+        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate)
         # ppo args
         self.clip_epsilon = algo_params['clip_epsilon']
         self.value_loss_weight = algo_params['value_loss_weight']
@@ -100,7 +101,6 @@ class PPO(Agent):
         done = False
         obs = self.env.reset()
         ep_return = 0
-        step = 0
         # start a new episode
         while not done:
             if render:
@@ -112,10 +112,10 @@ class PPO(Agent):
                 self._remember(obs, action, log_prob, new_obs, reward, 1 - int(done))
                 self.normalizer.store_history(new_obs)
                 self.normalizer.update_mean()
-                if (step % self.update_interval == 0) and (step != 0):
+                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count != 0):
                     self._learn()
             obs = new_obs
-            step += 1
+            self.env_step_count += 1
         return ep_return
 
     def _select_action(self, obs, test=False):

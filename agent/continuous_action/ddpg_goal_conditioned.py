@@ -17,6 +17,7 @@ class GoalConditionedDDPG(Agent):
                             'goal_dim': obs['desired_goal'].shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
+                            'action_scaling': self.env.action_space.high[0],
                             'init_input_means': None,
                             'init_input_vars': None
                             })
@@ -35,15 +36,15 @@ class GoalConditionedDDPG(Agent):
                                                   seed=seed)
         # torch
         self.network_dict.update({
-            'actor': Actor(self.state_dim + self.goal_dim, self.action_dim).to(self.device),
-            'actor_target': Actor(self.state_dim + self.goal_dim, self.action_dim).to(self.device),
+            'actor': Actor(self.state_dim + self.goal_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
+            'actor_target': Actor(self.state_dim + self.goal_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
             'critic': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device)
         })
         self.network_keys_to_save = ['actor_target', 'critic_target']
-        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
+        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
         self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
-        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.learning_rate)
+        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
         # behavioural policy args (exploration)
         # different from the original DDPG paper, the HER paper uses another exploration strategy
@@ -116,7 +117,6 @@ class GoalConditionedDDPG(Agent):
         done = False
         obs = self.env.reset()
         ep_return = 0
-        step = 0
         new_episode = True
         # start a new episode
         while not done:
@@ -132,7 +132,6 @@ class GoalConditionedDDPG(Agent):
                 self.normalizer.store_history(np.concatenate((new_obs['state'],
                                                               new_obs['desired_goal']), axis=0))
             obs = new_obs
-            step += 1
             new_episode = False
         self.normalizer.update_mean()
         return ep_return

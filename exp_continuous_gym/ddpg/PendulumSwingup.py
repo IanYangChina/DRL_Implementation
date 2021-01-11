@@ -3,14 +3,16 @@ import plot
 import pybullet_envs
 from agent import DDPG
 algo_params = {
-    'prioritised': False,
-    'memory_capacity': int(1e6),
-    'learning_rate': 0.0001,
+    'prioritised': True,
+    'memory_capacity': int(1e5),
+    'actor_learning_rate': 0.0001,
+    'critic_learning_rate': 0.001,
+    'Q_weight_decay': 0.0,
     'update_interval': 1,
-    'batch_size': 256,
+    'batch_size': 32,
     'optimization_steps': 1,
-    'tau': 0.005,
-    'discount_factor': 0.98,
+    'tau': 0.001,
+    'discount_factor': 0.99,
     'discard_time_limit': True,
 
     'training_episodes': 101,
@@ -24,6 +26,7 @@ path = os.path.dirname(os.path.realpath(__file__))
 for seed in seeds:
 
     env = pybullet_envs.make("InvertedPendulumSwingupBulletEnv-v0")
+    env.render()
 
     seed_path = path + '/seed'+str(seed)
 

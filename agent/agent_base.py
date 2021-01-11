@@ -33,6 +33,7 @@ class Agent(object):
         self.state_dim = algo_params['state_dim']
         self.action_dim = algo_params['action_dim']
         self.action_max = algo_params['action_max']
+        self.action_scaling = algo_params['action_scaling']
         self.prioritised = algo_params['prioritised']
         tr = transition_tuple
         if transition_tuple is None:
@@ -59,10 +60,12 @@ class Agent(object):
         # common args
         self.normalizer = Normalizer(self.state_dim+self.goal_dim,
                                      algo_params['init_input_means'], algo_params['init_input_vars'])
-        self.learning_rate = algo_params['learning_rate']
+        self.actor_learning_rate = algo_params['actor_learning_rate']
+        self.critic_learning_rate = algo_params['critic_learning_rate']
         self.batch_size = algo_params['batch_size']
         self.optimizer_steps = algo_params['optimization_steps']
-        self.step_count = 0
+        self.optim_step_count = 0
+        self.env_step_count = 0
         self.gamma = algo_params['discount_factor']
         self.discard_time_limit = algo_params['discard_time_limit']
         self.tau = algo_params['tau']

@@ -16,6 +16,7 @@ class GoalConditionedSAC(Agent):
                             'goal_dim': obs['desired_goal'].shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
+                            'action_scaling': self.env.action_space.high[0],
                             'init_input_means': None,
                             'init_input_vars': None
                             })
@@ -34,7 +35,7 @@ class GoalConditionedSAC(Agent):
                                                  seed=seed)
         # torch
         self.network_dict.update({
-            'actor': StochasticActor(self.state_dim + self.goal_dim, self.action_dim, log_std_min=-6, log_std_max=1).to(self.device),
+            'actor': StochasticActor(self.state_dim + self.goal_dim, self.action_dim, log_std_min=-6, log_std_max=1, action_scaling=self.action_scaling).to(self.device),
             'critic_1': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_1_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_2': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
@@ -43,13 +44,13 @@ class GoalConditionedSAC(Agent):
             'log_alpha': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
         self.network_keys_to_save = ['actor', 'critic_1_target']
-        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
-        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.learning_rate)
-        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.learning_rate)
+        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
+        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate)
+        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'], tau=1)
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         self.target_entropy = -self.action_dim
-        self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.learning_rate)
+        self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.actor_learning_rate)
         # training args
         self.update_interval = algo_params['update_interval']
         self.actor_update_interval = algo_params['actor_update_interval']
@@ -119,7 +120,6 @@ class GoalConditionedSAC(Agent):
         done = False
         obs = self.env.reset()
         ep_return = 0
-        step = 0
         new_episode = True
         # start a new episode
         while not done:
@@ -135,7 +135,6 @@ class GoalConditionedSAC(Agent):
                 self.normalizer.store_history(np.concatenate((new_obs['state'],
                                                               new_obs['desired_goal']), axis=0))
             obs = new_obs
-            step += 1
             new_episode = False
         self.normalizer.update_mean()
         return ep_return
@@ -204,11 +203,11 @@ class GoalConditionedSAC(Agent):
 
             self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
 
-            if self.step_count % self.critic_target_update_interval == 0:
+            if self.optim_step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
                 self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'])
 
-            if self.step_count % self.actor_update_interval == 0:
+            if self.optim_step_count % self.actor_update_interval == 0:
                 self.actor_optimizer.zero_grad()
                 new_actions, new_log_probs = self.network_dict['actor'].get_action(actor_inputs, probs=True)
                 critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
@@ -228,4 +227,4 @@ class GoalConditionedSAC(Agent):
                 self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
                 self.statistic_dict['policy_entropy'].append(-new_log_probs.detach().mean().cpu().numpy().item())
 
-            self.step_count += 1
+            self.optim_step_count += 1

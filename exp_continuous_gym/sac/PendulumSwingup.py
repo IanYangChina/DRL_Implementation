@@ -5,7 +5,8 @@ from agent import SAC
 algo_params = {
     'prioritised': True,
     'memory_capacity': int(1e6),
-    'learning_rate': 0.001,
+    'actor_learning_rate': 0.001,
+    'critic_learning_rate': 0.001,
     'update_interval': 1,
     'batch_size': 128,
     'optimization_steps': 1,

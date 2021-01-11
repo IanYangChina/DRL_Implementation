@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.optim.adam import Adam
 from agent.utils.networks import Actor, Critic
 from agent.agent_base import Agent
-from agent.utils.exploration_strategy import OUNoise
+from agent.utils.exploration_strategy import OUNoise, GaussianNoise
 
 
 class DDPG(Agent):
@@ -16,6 +16,7 @@ class DDPG(Agent):
         algo_params.update({'state_dim': obs.shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
+                            'action_scaling': self.env.action_space.high[0],
                             'init_input_means': None,
                             'init_input_vars': None
                             })
@@ -38,12 +39,13 @@ class DDPG(Agent):
             'critic_target': Critic(self.state_dim + self.action_dim, 1).to(self.device)
         })
         self.network_keys_to_save = ['actor_target', 'critic_target']
-        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate)
+        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
         self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
-        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.learning_rate)
+        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
         # behavioural policy args (exploration)
-        self.exploration_strategy = OUNoise(self.action_dim)
+        self.exploration_strategy = OUNoise(self.action_dim, rng=self.rng)
+        # self.exploration_strategy = GaussianNoise(self.action_dim, mu=0, sigma=0.5)
         # training args
         self.update_interval = algo_params['update_interval']
         # statistic dict
@@ -90,7 +92,6 @@ class DDPG(Agent):
         done = False
         obs = self.env.reset()
         ep_return = 0
-        step = 0
         self.exploration_strategy.reset()
         # start a new episode
         while not done:
@@ -103,10 +104,10 @@ class DDPG(Agent):
                 self._remember(obs, action, new_obs, reward, 1 - int(done))
                 self.normalizer.store_history(new_obs)
                 self.normalizer.update_mean()
-                if (step % self.update_interval == 0) and (step != 0):
+                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count != 0):
                     self._learn()
             obs = new_obs
-            step += 1
+            self.env_step_count += 1
         return ep_return
 
     def _select_action(self, obs, test=False):

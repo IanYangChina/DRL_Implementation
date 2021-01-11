@@ -16,6 +16,7 @@ class TD3(Agent):
         algo_params.update({'state_dim': obs.shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
+                            'action_scaling': self.env.action_space.high[0],
                             'init_input_means': None,
                             'init_input_vars': None
                             })
@@ -32,22 +33,24 @@ class TD3(Agent):
                                    seed=seed)
         # torch
         self.network_dict.update({
-            'actor': Actor(self.state_dim, self.action_dim).to(self.device),
-            'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
+            'actor': Actor(self.state_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
+            'actor_target': Actor(self.state_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
             'critic_1': Critic(self.state_dim + self.action_dim, 1).to(self.device),
             'critic_1_target': Critic(self.state_dim + self.action_dim, 1).to(self.device),
             'critic_2': Critic(self.state_dim + self.action_dim, 1).to(self.device),
             'critic_2_target': Critic(self.state_dim + self.action_dim, 1).to(self.device)
         })
         self.network_keys_to_save = ['actor_target', 'critic_1_target']
-        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.learning_rate, betas=(0.9, 0.999))
+        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
         self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
-        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.learning_rate, betas=(0.9, 0.999))
+        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'], tau=1)
-        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.learning_rate, betas=(0.9, 0.999))
+        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         # behavioural policy args (exploration)
-        self.target_noise = GaussianNoise(self.action_dim, mu=0, sigma=0.2)
+        self.warmup_step = 2500
+        self.target_noise = 0.2
+        self.noise_clip = 0.5
         self.exploration_strategy = GaussianNoise(self.action_dim, mu=0, sigma=0.1)
         # training args
         self.update_interval = algo_params['update_interval']
@@ -96,28 +99,30 @@ class TD3(Agent):
         done = False
         obs = self.env.reset()
         ep_return = 0
-        step = 0
         # start a new episode
         while not done:
             if render:
                 self.env.render()
-            action = self._select_action(obs, test=test)
+            if self.env_step_count < self.warmup_step:
+                action = self.env.action_space.sample()
+            else:
+                action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
             ep_return += reward
             if not test:
                 self._remember(obs, action, new_obs, reward, 1 - int(done))
-                self.normalizer.store_history(new_obs)
-                self.normalizer.update_mean()
-                if (step % self.update_interval == 0) and (step != 0):
+                # self.normalizer.store_history(new_obs)
+                # self.normalizer.update_mean()
+                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                     self._learn()
             obs = new_obs
-            step += 1
+            self.env_step_count += 1
         return ep_return
 
     def _select_action(self, obs, test=False):
         inputs = self.normalizer(obs)
         with T.no_grad():
-            inputs = T.tensor(inputs, dtype=T.float).to(self.device)
+            inputs = T.tensor(obs, dtype=T.float).to(self.device)
             action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
         if test:
             # evaluate
@@ -143,11 +148,11 @@ class TD3(Agent):
                 inds = None
 
             actor_inputs = self.normalizer(batch.state)
-            actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
+            actor_inputs = T.tensor(batch.state, dtype=T.float32).to(self.device)
             actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
             critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
             actor_inputs_ = self.normalizer(batch.next_state)
-            actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
+            actor_inputs_ = T.tensor(batch.next_state, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
 
@@ -157,7 +162,9 @@ class TD3(Agent):
             with T.no_grad():
                 actions_ = self.network_dict['actor_target'](actor_inputs_)
                 # add noise
-                actions_ += T.tensor(self.target_noise(), dtype=T.float32).to(self.device)
+                noise = (T.randn_like(actions_) * self.target_noise).to(self.device)
+                actions_ += noise.clamp(-self.noise_clip, self.noise_clip)
+                actions_ = actions_.clamp(-self.action_max[0], self.action_max[0])
                 critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
                 value_1_ = self.network_dict['critic_1_target'](critic_inputs_)
                 value_2_ = self.network_dict['critic_2_target'](critic_inputs_)
@@ -182,7 +189,7 @@ class TD3(Agent):
 
             self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
 
-            if self.step_count % self.actor_update_interval == 0:
+            if self.optim_step_count % self.actor_update_interval == 0:
                 self.actor_optimizer.zero_grad()
                 new_actions = self.network_dict['actor'](actor_inputs)
                 critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
@@ -196,4 +203,4 @@ class TD3(Agent):
 
                 self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
 
-            self.step_count += 1
+            self.optim_step_count += 1

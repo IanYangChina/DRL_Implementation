@@ -6,14 +6,15 @@ from agent import TD3
 algo_params = {
     'prioritised': True,
     'memory_capacity': int(1e6),
-    'learning_rate': 0.0001,
-    'batch_size': 256,
+    'actor_learning_rate': 0.0003,
+    'critic_learning_rate': 0.0003,
+    'batch_size': 512,
     'optimization_steps': 1,
     'tau': 0.005,
-    'discount_factor': 0.98,
+    'discount_factor': 0.99,
     'discard_time_limit': True,
 
-    'update_interval': 50,
+    'update_interval': 1,
     'actor_update_interval': 2,
 
     'training_episodes': 101,
@@ -28,6 +29,7 @@ path = os.path.dirname(os.path.realpath(__file__))
 for seed in seeds:
 
     env = pybullet_envs.make("InvertedPendulumSwingupBulletEnv-v0")
+    # env.render()
 
     seed_path = path + '/seed'+str(seed)
 
