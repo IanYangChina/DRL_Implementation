@@ -5,15 +5,15 @@ from agent import DDPG
 algo_params = {
     'prioritised': False,
     'memory_capacity': int(1e6),
-    'learning_rate': 0.001,
+    'learning_rate': 0.0001,
     'update_interval': 1,
-    'batch_size': 128,
+    'batch_size': 256,
     'optimization_steps': 1,
     'tau': 0.005,
     'discount_factor': 0.98,
     'discard_time_limit': True,
 
-    'training_episodes': 151,
+    'training_episodes': 101,
     'testing_gap': 10,
     'testing_episodes': 10,
     'saving_gap': 50,
@@ -29,9 +29,9 @@ for seed in seeds:
 
     agent = DDPG(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    seed_returns.append(agent.statistic_dict['episode_test_return'])
+    seed_returns.append(agent.statistic_dict['episode_return'])
     del env, agent
 
 return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
                                                file_name=os.path.join(path, 'return_statistic.json'))
-plot.smoothed_plot_mean_deviation(path + '/returns.png', return_statistic, x_label='Cycle', y_label='Average returns')
+plot.smoothed_plot_mean_deviation(path + '/returns.png', return_statistic, x_label='Episode', y_label='Average returns')

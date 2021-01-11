@@ -14,7 +14,7 @@ algo_params = {
     'GAE_lambda': 0.9,
     'entropy_loss_weight': 0.01,
 
-    'training_episodes': 151,
+    'training_episodes': 101,
     'testing_gap': 10,
     'testing_episodes': 10,
     'saving_gap': 50,
@@ -31,9 +31,9 @@ for seed in seeds:
 
     agent = PPO(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    seed_returns.append(agent.statistic_dict['episode_test_return'])
+    seed_returns.append(agent.statistic_dict['episode_return'])
     del env, agent
 
 return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
                                                file_name=os.path.join(path, 'return_statistic.json'))
-plot.smoothed_plot_mean_deviation(path + '/returns.png', return_statistic, x_label='Cycle', y_label='Average returns')
+plot.smoothed_plot_mean_deviation(path + '/returns.png', return_statistic, x_label='Episode', y_label='Average returns')

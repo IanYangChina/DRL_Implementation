@@ -3,7 +3,7 @@ import plot
 import pybullet_envs
 from agent import SAC
 algo_params = {
-    'prioritised': False,
+    'prioritised': True,
     'memory_capacity': int(1e6),
     'learning_rate': 0.001,
     'update_interval': 1,
@@ -17,7 +17,7 @@ algo_params = {
     'actor_update_interval': 2,
     'critic_target_update_interval': 2,
 
-    'training_episodes': 151,
+    'training_episodes': 101,
     'testing_gap': 10,
     'testing_episodes': 10,
     'saving_gap': 50,
@@ -34,7 +34,7 @@ for seed in seeds:
 
     agent = SAC(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    seed_returns.append(agent.statistic_dict['episode_test_return'])
+    seed_returns.append(agent.statistic_dict['episode_return'])
     del env, agent
 
 return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,

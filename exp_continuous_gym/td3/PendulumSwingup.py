@@ -2,11 +2,12 @@ import os
 import plot
 import pybullet_envs
 from agent import TD3
+# parameters have bee tuned for the swingup task
 algo_params = {
-    'prioritised': False,
+    'prioritised': True,
     'memory_capacity': int(1e6),
-    'learning_rate': 0.001,
-    'batch_size': 128,
+    'learning_rate': 0.0001,
+    'batch_size': 256,
     'optimization_steps': 1,
     'tau': 0.005,
     'discount_factor': 0.98,
@@ -15,7 +16,7 @@ algo_params = {
     'update_interval': 50,
     'actor_update_interval': 2,
 
-    'training_episodes': 151,
+    'training_episodes': 101,
     'testing_gap': 10,
     'testing_episodes': 10,
     'saving_gap': 50,
@@ -32,7 +33,7 @@ for seed in seeds:
 
     agent = TD3(algo_params=algo_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    seed_returns.append(agent.statistic_dict['episode_test_return'])
+    seed_returns.append(agent.statistic_dict['episode_return'])
     del env, agent
 
 return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
