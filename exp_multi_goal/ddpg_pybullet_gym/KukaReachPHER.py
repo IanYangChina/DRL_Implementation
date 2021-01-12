@@ -4,9 +4,11 @@ import pybullet_multigoal_gym as pmg
 from agent import GoalConditionedDDPG
 algo_params = {
     'hindsight': True,
-    'prioritised': False,
+    'prioritised': True,
     'memory_capacity': int(1e6),
-    'learning_rate': 0.001,
+    'actor_learning_rate': 0.001,
+    'critic_learning_rate': 0.001,
+    'Q_weight_decay': 0.0,
     'update_interval': 1,
     'batch_size': 128,
     'optimization_steps': 40,
@@ -14,6 +16,7 @@ algo_params = {
     'discount_factor': 0.98,
     'clip_value': 50,
     'discard_time_limit': True,
+    'observation_normalization': True,
 
     'random_action_chance': 0.2,
     'noise_deviation': 0.05,

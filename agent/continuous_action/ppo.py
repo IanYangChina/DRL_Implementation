@@ -5,7 +5,7 @@ from torch.optim.adam import Adam
 from agent.utils.networks import StochasticActor, Critic
 from agent.agent_base import Agent
 from collections import namedtuple
-
+from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 
 class PPO(Agent):
     def __init__(self, algo_params, env, transition_tuple=None, path=None, seed=-1):
@@ -32,7 +32,9 @@ class PPO(Agent):
         algo_params['tau'] = 1.0
         if transition_tuple is None:
             # ppo needs to store historical log probabilities in the buffer
-            transition_tuple = namedtuple("transition", ('state', 'action', 'log_prob', 'next_state', 'reward', 'done'))
+            #   it is convenient to also store state values
+            transition_tuple = namedtuple("transition", ('state', 'action', 'log_prob', 'state_value',
+                                                         'next_state', 'reward', 'done'))
         super(PPO, self).__init__(algo_params,
                                    transition_tuple=transition_tuple,
                                    goal_conditioned=False,
@@ -52,6 +54,18 @@ class PPO(Agent):
         self.value_loss_weight = algo_params['value_loss_weight']
         self.GAE_lambda = algo_params['GAE_lambda']
         self.entropy_loss_weight = algo_params['entropy_loss_weight']
+
+        # ppo split a big batch of data into several mini batches to go over for each optimization step (epoch)
+        # use a built-in torch sampler to do this
+        # see: https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail/blob/b1152f8e251d827c5c1199aa543fa2739cb12691/a2c_ppo_acktr/storage.py#L107
+        # see: https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail/blob/b1152f8e251d827c5c1199aa543fa2739cb12691/a2c_ppo_acktr/algo/ppo.py#L34
+        self.mini_batch_size = algo_params['mini_batch_size']
+        assert self.batch_size > self.mini_batch_size
+        self.sampler = BatchSampler(
+            sampler=SubsetRandomSampler(range(self.batch_size)),
+            batch_size=self.mini_batch_size,
+            drop_last=True)
+
         # training args
         # ppo updates network when a batch is available, and discards the data after optimization step
         self.update_interval = self.batch_size
@@ -105,13 +119,18 @@ class PPO(Agent):
         while not done:
             if render:
                 self.env.render()
-            action, log_prob = self._select_action(obs, test=test)
+            action, log_prob, state_value = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
             ep_return += reward
             if not test:
-                self._remember(obs, action, log_prob, new_obs, reward, 1 - int(done))
-                self.normalizer.store_history(new_obs)
-                self.normalizer.update_mean()
+                done_to_save = done
+                if self.env._elapsed_steps == self.env._max_episode_steps:
+                    # discard time limit terminal flags, record true terminal flags
+                    done_to_save = 1-int(done)
+                self._remember(obs, action, log_prob, state_value, new_obs, reward, 1 - int(done_to_save))
+                if self.observation_normalization:
+                    self.normalizer.store_history(new_obs)
+                    self.normalizer.update_mean()
                 if (self.env_step_count % self.update_interval == 0) and (self.env_step_count != 0):
                     self._learn()
             obs = new_obs
@@ -123,12 +142,13 @@ class PPO(Agent):
         inputs = T.tensor(inputs, dtype=T.float).to(self.device)
         if test:
             action = self.network_dict['old_actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
-            return np.clip(action, -self.action_max, self.action_max), None
+            return np.clip(action, -self.action_max, self.action_max), None, None
         else:
             action, probs = self.network_dict['old_actor'].get_action(inputs, probs=True)
             action = action[0].detach().cpu().numpy()
             probs = probs[0].detach().cpu().numpy()
-            return np.clip(action, -self.action_max, self.action_max), probs
+            state_value = self.network_dict['critic'](inputs)
+            return np.clip(action, -self.action_max, self.action_max), probs, state_value
 
     def _learn(self, steps=None):
         if len(self.buffer) < self.batch_size:
@@ -136,7 +156,6 @@ class PPO(Agent):
         if steps is None:
             steps = self.optimizer_steps
 
-        # todo: change the sample method
         batch = self.buffer.full_memory
 
         actor_inputs = self.normalizer(batch.state)
@@ -144,71 +163,70 @@ class PPO(Agent):
         actor_inputs_ = self.normalizer(batch.next_state)
         actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
         actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
-        log_probs = T.tensor(batch.log_prob, dtype=T.float32).to(self.device)
-        rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
-        done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+        old_log_probs = T.tensor(batch.log_prob, dtype=T.float32).to(self.device)
+        state_values = T.tensor(batch.state_value, dtype=T.float32).to(self.device)
+        next_state_values = self.network_dict['critic'](actor_inputs_).detach().view(state_values.size())
+        rewards = T.tensor(batch.reward, dtype=T.float32).to(self.device)
+        done = T.tensor(batch.done, dtype=T.float32).to(self.device)
 
         # compute N-step returns & Generalized Advantage Estimator
         #   see https://arxiv.org/pdf/2006.05990.pdf Appendix B.2
-        reversed_rewards = rewards.flip(0)
-        reversed_next_states = actor_inputs_.flip(0)
-        reversed_done = done.flip(0)
-        n_step_returns = []
+        reversed_rewards = T.flip(rewards, dims=[0])
+        reversed_state_values = T.flip(state_values, dims=[0])
+        reversed_next_state_values = T.flip(next_state_values, dims=[0])
+        reversed_done = T.flip(done, dims=[0])
         GAE_returns = []
-        discounted_return = 0
-        cumulated_step_count = 1
-        last_next_state = reversed_next_states[0]
-        last_next_state_value = self.network_dict['critic'](last_next_state)
-        discounted_GAE_return = 0
+        gae = 0
+        delta = reversed_rewards + reversed_done * self.gamma * reversed_next_state_values - reversed_state_values
         for i in range(reversed_rewards.shape[0]):
-            # done flags are stored as 0/1 integers, where 0 represents a done state
+            # done flags are stored as 0/1 integers, where 0 represents a terminal next state
             # reset discounted return and cumulated steps when encounter a [True] done flag
             # recalculate the last next state value
-            if reversed_done[i] == 0:
-                discounted_return = 0
-                cumulated_step_count = 1
-                last_next_state_value = self.network_dict['critic'](reversed_next_states[i])
-                discounted_GAE_return = 0
-            discounted_return = reversed_rewards[i] + self.gamma * discounted_return
-            # add a discounted next state value to the n-step return
-            discount_rate = np.power(self.gamma, cumulated_step_count)
-            n_step_return = discounted_return + discount_rate*last_next_state_value.detach()
-            cumulated_step_count += 1
-            # insert n-step returns top-down
-            n_step_returns.insert(0, n_step_return)
-            # calculate GAE value
-            GAE_discount_rate = np.power(self.GAE_lambda, cumulated_step_count-1)
-            discounted_GAE_return += GAE_discount_rate * n_step_return
-            GAE_returns.insert(0, (1-self.GAE_lambda)*discounted_GAE_return)
 
-        n_step_returns = T.tensor(n_step_returns, dtype=T.float32).unsqueeze(1).to(self.device)
+            gae = delta[i] + self.gamma * self.GAE_lambda * gae * reversed_done[i]
+            gae = gae * reversed_done[i]
+            gae_return = gae + reversed_state_values[i]
+            GAE_returns.insert(0, gae_return)
+
         GAE_returns = T.tensor(GAE_returns, dtype=T.float32).unsqueeze(1).to(self.device)
+        GAE = GAE_returns - state_values
+        # normalize advantages
+        GAE = (GAE - GAE.mean()) / (GAE.std() + 1e-5)
 
+        # go over the batch several times
         for step in range(steps):
-            log_probs_, entropy = self.network_dict['actor'].get_log_probs(actor_inputs, actions)
-            state_values = self.network_dict['critic'](actor_inputs)
+            # each time split the batch into several mini batches
+            for indices in self.sampler:
+                mb_actor_inputs = actor_inputs[indices]
+                mb_actions = actions[indices]
+                mb_old_log_probs = old_log_probs[indices]
+                mb_GAE_returns = GAE_returns[indices]
 
-            ratio = T.exp(log_probs_ - log_probs.detach())
-            GAE = GAE_returns - state_values.detach()
+                mb_log_probs_, mb_entropy = self.network_dict['actor'].get_log_probs(mb_actor_inputs, mb_actions)
+                mb_state_values = self.network_dict['critic'](mb_actor_inputs)
 
-            L_clip = T.min(
-                ratio*GAE,
-                T.clamp(ratio, 1-self.clip_epsilon, 1+self.clip_epsilon)*GAE
-            )
-            loss = -(L_clip -
-                     self.value_loss_weight*F.mse_loss(state_values, n_step_returns) +
-                     self.entropy_loss_weight*entropy.mean())
+                mb_ratio = T.exp(mb_log_probs_ - mb_old_log_probs.detach())
+                mb_GAE = GAE[indices]
 
-            self.actor_optimizer.zero_grad()
-            self.critic_optimizer.zero_grad()
-            loss.mean().backward()
-            self.actor_optimizer.step()
-            self.critic_optimizer.step()
+                L_clip = T.min(
+                    mb_ratio*mb_GAE,
+                    T.clamp(mb_ratio, 1-self.clip_epsilon, 1+self.clip_epsilon)*mb_GAE
+                )
+                value_loss = F.mse_loss(mb_state_values, mb_GAE_returns)
+                loss = -(L_clip -
+                         self.value_loss_weight*value_loss +
+                         self.entropy_loss_weight*mb_entropy.mean())
 
-            self.statistic_dict['critic_loss'].append(F.mse_loss(state_values, n_step_returns).detach().mean().cpu().numpy().item())
-            self.statistic_dict['actor_loss'].append(loss.detach().mean().cpu().numpy().item())
-            self.statistic_dict['clipped_loss'].append(L_clip.detach().mean().cpu().numpy().item())
-            self.statistic_dict['policy_entropy'].append(-log_probs_.detach().mean().cpu().numpy().item())
+                self.actor_optimizer.zero_grad()
+                self.critic_optimizer.zero_grad()
+                loss.mean().backward()
+                self.actor_optimizer.step()
+                self.critic_optimizer.step()
+
+                self.statistic_dict['critic_loss'].append(value_loss.detach().mean().cpu().numpy().item())
+                self.statistic_dict['actor_loss'].append(loss.detach().mean().cpu().numpy().item())
+                self.statistic_dict['clipped_loss'].append(L_clip.detach().mean().cpu().numpy().item())
+                self.statistic_dict['policy_entropy'].append(-mb_log_probs_.detach().mean().cpu().numpy().item())
 
         self.network_dict['old_actor'].load_state_dict(self.network_dict['actor'].state_dict())
         self.buffer.clear_memory()

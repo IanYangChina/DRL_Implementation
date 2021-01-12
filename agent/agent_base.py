@@ -19,11 +19,16 @@ class Agent(object):
     def __init__(self, algo_params, transition_tuple=None, goal_conditioned=False, path=None, seed=-1):
         # path & seeding
         T.manual_seed(seed)
+        T.cuda.manual_seed_all(seed)  # this has no effect is cuda is not available
+        # create a random number generator and seed it
         self.rng = np.random.default_rng(seed=seed)
-        assert path is not None, 'please specify a project path'
+        assert path is not None, 'please specify a project path to save files'
         self.path = path
+        # path to save neural network check point
         self.ckpt_path = os.path.join(path, 'ckpts')
+        # path to save statistics
         self.data_path = os.path.join(path, 'data')
+        # create directories if not exist
         mkdir([self.path, self.ckpt_path, self.data_path])
 
         # torch device
@@ -35,6 +40,8 @@ class Agent(object):
         self.action_max = algo_params['action_max']
         self.action_scaling = algo_params['action_scaling']
         self.prioritised = algo_params['prioritised']
+
+        # setup non-goal-conditioned transition tuple for replay buffer
         tr = transition_tuple
         if transition_tuple is None:
             tr = t
@@ -43,7 +50,7 @@ class Agent(object):
         else:
             self.buffer = PrioritisedReplayBuffer(algo_params['memory_capacity'], tr, rng=self.rng)
 
-        # goal-conditioned args
+        # goal-conditioned args & buffers
         self.goal_conditioned = goal_conditioned
         if self.goal_conditioned:
             self.goal_dim = algo_params['goal_dim']
@@ -59,6 +66,7 @@ class Agent(object):
 
         # common args
         self.observation_normalization = algo_params['observation_normalization']
+        # if not using obs normalization, the normalizer is just an identity mapping
         self.normalizer = Normalizer(self.state_dim+self.goal_dim,
                                      algo_params['init_input_means'], algo_params['init_input_vars'],
                                      activated=self.observation_normalization)
@@ -71,8 +79,12 @@ class Agent(object):
         self.gamma = algo_params['discount_factor']
         self.discard_time_limit = algo_params['discard_time_limit']
         self.tau = algo_params['tau']
+
+        # network dict is filled in each specific agent
         self.network_dict = {}
         self.network_keys_to_save = None
+
+        # algorithm-specific statistics are defined in each agent sub-class
         self.statistic_dict = {
             # use lowercase characters
             'actor_loss': [],
