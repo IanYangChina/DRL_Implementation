@@ -34,10 +34,10 @@ return_ddpg = json.load(open(os.path.join(path, 'exp_continuous_gym', 'half_chee
 return_td3 = json.load(open(os.path.join(path, 'exp_continuous_gym', 'half_cheetah', 'td3', 'return_statistic.json')))
 return_sac = json.load(open(os.path.join(path, 'exp_continuous_gym', 'half_cheetah', 'sac', 'return_statistic.json')))
 
-plot.smoothed_plot_mean_deviation(os.path.join(path, 'src', 'returns_pendulum.png'),
+plot.smoothed_plot_mean_deviation(os.path.join(path, 'src', 'returns_half_cheetah.png'),
                                   [return_ddpg, return_td3, return_sac],
                                   legend=['DDPG', 'TD3', 'SAC'],
                                   legend_loc='lower right',
-                                  title='Pybullet Inverted Pendulum Swing up (6 seeds)',
+                                  title='Pybullet Half Cheetah (6 seeds)',
                                   window=10,
                                   x_label='Episode', y_label='Average returns')
