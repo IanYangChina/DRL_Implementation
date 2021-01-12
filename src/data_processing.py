@@ -30,14 +30,14 @@ path = path[:-4]
 #                                   window=20,
 #                                   x_label='Cycle', y_label='Average success_rates')
 
-# return_ddpg = json.load(open(os.path.join(path, 'exp_continuous_gym', 'pendulum', 'ddpg', 'return_statistic.json')))
-# return_td3 = json.load(open(os.path.join(path, 'exp_continuous_gym', 'pendulum', 'td3', 'return_statistic.json')))
-# return_sac = json.load(open(os.path.join(path, 'exp_continuous_gym', 'pendulum', 'sac', 'return_statistic.json')))
-#
-# plot.smoothed_plot_mean_deviation(os.path.join(path, 'src', 'returns_pendulum.png'),
-#                                   [return_ddpg, return_td3, return_sac],
-#                                   legend=['DDPG', 'TD3', 'SAC'],
-#                                   legend_loc='lower right',
-#                                   title='Pybullet Inverted Pendulum Swingup (6 seeds)',
-#                                   window=10,
-#                                   x_label='Episode', y_label='Average returns')
+return_ddpg = json.load(open(os.path.join(path, 'exp_continuous_gym', 'half_cheetah', 'ddpg', 'return_statistic.json')))
+return_td3 = json.load(open(os.path.join(path, 'exp_continuous_gym', 'half_cheetah', 'td3', 'return_statistic.json')))
+return_sac = json.load(open(os.path.join(path, 'exp_continuous_gym', 'half_cheetah', 'sac', 'return_statistic.json')))
+
+plot.smoothed_plot_mean_deviation(os.path.join(path, 'src', 'returns_pendulum.png'),
+                                  [return_ddpg, return_td3, return_sac],
+                                  legend=['DDPG', 'TD3', 'SAC'],
+                                  legend_loc='lower right',
+                                  title='Pybullet Inverted Pendulum Swing up (6 seeds)',
+                                  window=10,
+                                  x_label='Episode', y_label='Average returns')
