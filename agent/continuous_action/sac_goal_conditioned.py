@@ -132,8 +132,9 @@ class GoalConditionedSAC(Agent):
                 self._remember(obs['state'], obs['desired_goal'], action,
                                new_obs['state'], new_obs['achieved_goal'], reward, 1 - int(done),
                                new_episode=new_episode)
-                self.normalizer.store_history(np.concatenate((new_obs['state'],
-                                                              new_obs['desired_goal']), axis=0))
+                if self.observation_normalization:
+                    self.normalizer.store_history(np.concatenate((new_obs['state'],
+                                                                  new_obs['desired_goal']), axis=0))
             obs = new_obs
             new_episode = False
         self.normalizer.update_mean()
