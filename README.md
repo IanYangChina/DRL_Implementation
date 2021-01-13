@@ -22,8 +22,6 @@ Gym-like training environments as possible
 - [ ] R2D2 - Deterministic, Discrete
 
 #### Algorithms: Hierarchical
-- [X] Option DQN - Hindsight, Deterministic, Discrete
-- [X] Option Critic - Hindsight, Stochastic, Discrete & Continuous
 - [ ] HIRO - Hindsight, Deterministic, Continuous
 - [ ] HAC - Hindsight, Deterministic, Continuous
 
@@ -31,12 +29,12 @@ Gym-like training environments as possible
 - [X] Hindsight
 - [X] Prioritised
 
-#### Environments
-- [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal, Customized)
+#### Tested Environments
+- [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal)
 - [X] OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous, Official)
 - [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics 
-Multigoal Pybullet Migration) (Continuous, Official)
-- [ ] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous, Customized)
+Multigoal Pybullet Migration) (Continuous)
+- [X] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous)
 
 #### Some result figures
 <img src="/src/returns_pybullet_kuka_reach.png" width="350"/>
@@ -55,7 +53,6 @@ Multigoal Pybullet Migration) (Continuous, Official)
 * [HIRO](http://papers.nips.cc/paper/7591-data-efficient-hierarchical-reinforcement-learning.pdf)
 * [HAC](https://arxiv.org/abs/1712.00948)
 * [OptionFramework](https://www.sciencedirect.com/science/article/pii/S0004370299000521)
-* [OptionCritic](https://www.aaai.org/ocs/index.php/AAAI/AAAI17/paper/viewPaper/14858)
 * [D4PG](https://arxiv.org/abs/1804.08617)
 * [R2D2](https://openreview.net/pdf?id=r1lyTjAqYX)
 
