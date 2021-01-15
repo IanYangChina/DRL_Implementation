@@ -35,7 +35,7 @@ path = os.path.join(path, 'Reach_PHER')
 
 for seed in seeds:
 
-    env = pmg.make("KukaReachSparseEnv-v0")
+    env = pmg.make("KukaParallelGripReachSparseEnv-v0")
 
     seed_path = path + '/seed'+str(seed)
 
