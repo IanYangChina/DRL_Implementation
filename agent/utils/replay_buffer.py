@@ -131,38 +131,30 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                     self.episodes.append(modified_ep)
         else:
-            # 'future' strategy
             for _ in range(len(self.episodes)):
+                # 'future' strategy
+                # get a transition, and sample k achieved goals after that transition for replacement
                 ep = self.episodes[_]
-                inds = R.sample(np.arange(len(ep)-1, dtype="int").tolist(), self.k)
+                transition_ind = R.randint(0, len(ep)-(self.k+1))
+                goal_inds = R.sample(np.arange(transition_ind+1, len(ep), dtype="int").tolist(), self.k)
                 modified_ep = []
-                for ind in inds:
-                    s = ep[ind].state
-                    dg = ep[ind+1].achieved_goal
-                    a = ep[ind].action
-                    ns = ep[ind].next_state
-                    ag = ep[ind].achieved_goal
+                for ind in goal_inds:
+                    s = ep[transition_ind].state
+                    dg = ep[ind].achieved_goal
+                    a = ep[transition_ind].action
+                    ns = ep[transition_ind].next_state
+                    ag = ep[transition_ind].achieved_goal
                     r = goal_distance_reward(dg, ag)
-                    d = ep[ind].done
+                    d = ep[transition_ind].done
                     modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                 self.episodes.append(modified_ep)
 
     def sample_achieved_goal(self, ep):
         goals = [[], []]
         if self.sampling_strategy == 'episode':
-            for _ in range(self.k):
-                done = False
-                count = 0
-                while not done:
-                    count += 1
-                    if count > len(ep):
-                        break
-                    ind = R.randint(0, len(ep)-1)
-                    goal = ep[ind].achieved_goal
-                    if all(not np.array_equal(goal, g) for g in goals[1]):
-                        goals[0].append(ind)
-                        goals[1].append(goal)
-                        done = True
+            goals[0] = R.sample(np.arange(len(ep)-20, len(ep), dtype="int").tolist(), self.k)
+            for ind in goals[0]:
+                goals[1].append(ep[ind].achieved_goal)
         elif self.sampling_strategy == 'final':
             goals[0].append(len(ep)-1)
             goals[1].append(ep[-1].achieved_goal)
@@ -380,8 +372,8 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
     def modify_episodes(self):
         if len(self.episodes) == 0:
             return
-        for _ in range(len(self.episodes)):
-            if self.sampling_strategy != 'future':
+        if self.sampling_strategy != 'future':
+            for _ in range(len(self.episodes)):
                 # 'episode' or 'final' strategy
                 ep = self.episodes[_]
                 imagined_goals = self.sample_achieved_goal(ep)
@@ -399,38 +391,31 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                         d = ep[tr].done
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                     self.episodes.append(modified_ep)
-            else:
+        else:
+            for _ in range(len(self.episodes)):
                 # 'future' strategy
+                # get a transition, and sample k achieved goals after that transition for replacement
                 ep = self.episodes[_]
-                inds = R.sample(np.arange(len(ep)-1, dtype="int").tolist(), self.k)
+                transition_ind = R.randint(0, len(ep)-(self.k+1))
+                goal_inds = R.sample(np.arange(transition_ind+1, len(ep), dtype="int").tolist(), self.k)
                 modified_ep = []
-                for ind in inds:
-                    s = ep[ind].state
-                    dg = ep[ind+1].achieved_goal
-                    a = ep[ind].action
-                    ns = ep[ind].next_state
-                    ag = ep[ind].achieved_goal
+                for ind in goal_inds:
+                    s = ep[transition_ind].state
+                    dg = ep[ind].achieved_goal
+                    a = ep[transition_ind].action
+                    ns = ep[transition_ind].next_state
+                    ag = ep[transition_ind].achieved_goal
                     r = goal_distance_reward(dg, ag)
-                    d = ep[ind].done
+                    d = ep[transition_ind].done
                     modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                 self.episodes.append(modified_ep)
 
     def sample_achieved_goal(self, ep):
         goals = [[], []]
         if self.sampling_strategy == 'episode':
-            for _ in range(self.k):
-                done = False
-                count = 0
-                while not done:
-                    count += 1
-                    if count > len(ep):
-                        break
-                    ind = R.randint(0, len(ep)-1)
-                    goal = ep[ind].achieved_goal
-                    if all(not np.array_equal(goal, g) for g in goals[1]):
-                        goals[0].append(ind)
-                        goals[1].append(goal)
-                        done = True
+            goals[0] = R.sample(np.arange(len(ep)-20, len(ep), dtype="int").tolist(), self.k)
+            for ind in goals[0]:
+                goals[1].append(ep[ind].achieved_goal)
         elif self.sampling_strategy == 'final':
             goals[0].append(len(ep)-1)
             goals[1].append(ep[-1].achieved_goal)

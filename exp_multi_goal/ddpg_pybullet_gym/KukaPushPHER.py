@@ -33,11 +33,11 @@ seeds = [11, 22, 33, 44, 55, 66]
 seed_returns = []
 seed_success_rates = []
 path = os.path.dirname(os.path.realpath(__file__))
-path = os.path.join(path, 'Slide_PHER')
+path = os.path.join(path, 'Push_PHER')
 
 for seed in seeds:
 
-    env = pmg.make("KukaParallelGripSlideRenderSparseEnv-v0")
+    env = pmg.make("KukaParallelGripPushSparseEnv-v0")
 
     seed_path = path + '/seed'+str(seed)
 

@@ -4,6 +4,7 @@ import pybullet_multigoal_gym as pmg
 from agent import GoalConditionedSAC
 algo_params = {
     'hindsight': True,
+    'her_sampling_strategy': 'future',
     'prioritised': True,
     'memory_capacity': int(1e6),
     'actor_learning_rate': 0.001,
@@ -35,7 +36,7 @@ path = os.path.join(path, 'Reach_PHER')
 
 for seed in seeds:
 
-    env = pmg.make("KukaParallelGripReachRenderSparseEnv-v0")
+    env = pmg.make("KukaParallelGripReachSparseEnv-v0")
 
     seed_path = path + '/seed'+str(seed)
 

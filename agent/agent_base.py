@@ -58,9 +58,16 @@ class Agent(object):
             if transition_tuple is None:
                 tr = t_goal
             if not self.prioritised:
-                self.buffer = HindsightReplayBuffer(algo_params['memory_capacity'], tr, sampled_goal_num=4, seed=seed)
+                self.buffer = HindsightReplayBuffer(algo_params['memory_capacity'], tr,
+                                                    sampling_strategy=algo_params['her_sampling_strategy'],
+                                                    sampled_goal_num=4,
+                                                    seed=seed)
             else:
-                self.buffer = PrioritisedHindsightReplayBuffer(algo_params['memory_capacity'], tr, rng=self.rng)
+                self.buffer = PrioritisedHindsightReplayBuffer(algo_params['memory_capacity'],
+                                                               tr,
+                                                               sampling_strategy=algo_params['her_sampling_strategy'],
+                                                               sampled_goal_num=4,
+                                                               rng=self.rng)
         else:
             self.goal_dim = 0
 

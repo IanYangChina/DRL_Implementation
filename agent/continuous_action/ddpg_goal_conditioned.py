@@ -38,14 +38,18 @@ class GoalConditionedDDPG(Agent):
         self.network_dict.update({
             'actor': Actor(self.state_dim + self.goal_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
             'actor_target': Actor(self.state_dim + self.goal_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
-            'critic': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
-            'critic_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device)
+            'critic_1': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
+            'critic_1_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
+            'critic_2': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
+            'critic_2_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
         })
         self.network_keys_to_save = ['actor_target', 'critic_target']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
         self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
-        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
-        self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
+        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
+        self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'], tau=1)
+        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
+        self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         # behavioural policy args (exploration)
         # different from the original DDPG paper, the HER paper uses another exploration strategy
         #   paper: https://papers.nips.cc/paper/2017/hash/453fadbd8a1a3af50a9df4df899537b5-Abstract.html
@@ -91,6 +95,7 @@ class GoalConditionedDDPG(Agent):
                       "success rate %0.1f" % (cycle_success / self.training_episodes))
 
             if (epo % self.testing_gap == 0) and (epo != 0) and (not test):
+                # testing during training
                 test_return = 0
                 test_success = 0
                 for test_ep in range(self.testing_episodes):
@@ -192,29 +197,40 @@ class GoalConditionedDDPG(Agent):
             with T.no_grad():
                 actions_ = self.network_dict['actor_target'](actor_inputs_)
                 critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
-                value_ = self.network_dict['critic_target'](critic_inputs_)
+                value_1_ = self.network_dict['critic_1_target'](critic_inputs_)
+                value_2_ = self.network_dict['critic_2_target'](critic_inputs_)
+                value_ = T.min(value_1_, value_2_)
                 value_target = rewards + done * self.gamma * value_
-                value_target = T.clamp(value_target.detach(), -self.clip_value, 0)
+                value_target = T.clamp(value_target, -self.clip_value, 0.0)
 
-            self.critic_optimizer.zero_grad()
-            value_estimate = self.network_dict['critic'](critic_inputs)
-            critic_loss = F.mse_loss(value_estimate, value_target, reduction='none')
-            (critic_loss * weights).mean().backward()
-            self.critic_optimizer.step()
+            self.critic_1_optimizer.zero_grad()
+            value_estimate_1 = self.network_dict['critic_1'](critic_inputs)
+            critic_loss_1 = F.mse_loss(value_estimate_1, value_target.detach(), reduction='none')
+            (critic_loss_1 * weights).mean().backward()
+            self.critic_1_optimizer.step()
 
             if self.prioritised:
                 assert inds is not None
-                self.buffer.update_priority(inds, np.abs(critic_loss.cpu().detach().numpy()))
+                self.buffer.update_priority(inds, np.abs(critic_loss_1.cpu().detach().numpy()))
+
+            self.critic_2_optimizer.zero_grad()
+            value_estimate_2 = self.network_dict['critic_2'](critic_inputs)
+            critic_loss_2 = F.mse_loss(value_estimate_2, value_target.detach(), reduction='none')
+            (critic_loss_2 * weights).mean().backward()
+            self.critic_2_optimizer.step()
 
             self.actor_optimizer.zero_grad()
             new_actions = self.network_dict['actor'](actor_inputs)
             critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
-            actor_loss = -self.network_dict['critic'](critic_eval_inputs).mean()
+            new_values_1 = self.network_dict['critic_1'](critic_eval_inputs)
+            new_values_2 = self.network_dict['critic_2'](critic_eval_inputs)
+            actor_loss = -T.min(new_values_1, new_values_2).mean()
             actor_loss.backward()
             self.actor_optimizer.step()
 
-            self.statistic_dict['critic_loss'].append(critic_loss.detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
             self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
 
-        self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
-        self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'])
+            self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
+            self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
+            self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'])

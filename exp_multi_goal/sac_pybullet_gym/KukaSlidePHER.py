@@ -4,6 +4,7 @@ import pybullet_multigoal_gym as pmg
 from agent import GoalConditionedSAC
 algo_params = {
     'hindsight': True,
+    'her_sampling_strategy': 'future',
     'prioritised': True,
     'memory_capacity': int(1e6),
     'actor_learning_rate': 0.0003,
