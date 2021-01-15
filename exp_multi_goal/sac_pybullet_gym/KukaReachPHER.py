@@ -6,8 +6,8 @@ algo_params = {
     'hindsight': True,
     'prioritised': True,
     'memory_capacity': int(1e6),
-    'actor_learning_rate': 0.0003,
-    'critic_learning_rate': 0.0003,
+    'actor_learning_rate': 0.001,
+    'critic_learning_rate': 0.001,
     'update_interval': 1,
     'batch_size': 128,
     'optimization_steps': 40,
@@ -35,7 +35,7 @@ path = os.path.join(path, 'Reach_PHER')
 
 for seed in seeds:
 
-    env = pmg.make("KukaParallelGripReachSparseEnv-v0")
+    env = pmg.make("KukaParallelGripReachRenderSparseEnv-v0")
 
     seed_path = path + '/seed'+str(seed)
 
