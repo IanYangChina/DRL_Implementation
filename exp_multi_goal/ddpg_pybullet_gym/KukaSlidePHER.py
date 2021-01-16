@@ -37,7 +37,7 @@ path = os.path.join(path, 'Slide_PHER')
 
 for seed in seeds:
 
-    env = pmg.make("KukaParallelGripSlideRenderSparseEnv-v0")
+    env = pmg.make("KukaParallelGripSlideSparseEnv-v0")
 
     seed_path = path + '/seed'+str(seed)
 
