@@ -133,21 +133,21 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
         else:
             for _ in range(len(self.episodes)):
                 # 'future' strategy
-                # get a transition, and sample k achieved goals after that transition for replacement
+                # for eah transition, sample k achieved goals after that transition to replace the desired goal
                 ep = self.episodes[_]
-                transition_ind = R.randint(0, len(ep)-(self.k+1))
-                goal_inds = R.sample(np.arange(transition_ind+1, len(ep), dtype="int").tolist(), self.k)
-                modified_ep = []
-                for ind in goal_inds:
-                    s = ep[transition_ind].state
-                    dg = ep[ind].achieved_goal
-                    a = ep[transition_ind].action
-                    ns = ep[transition_ind].next_state
-                    ag = ep[transition_ind].achieved_goal
-                    r = goal_distance_reward(dg, ag)
-                    d = ep[transition_ind].done
-                    modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                self.episodes.append(modified_ep)
+                for tr_ind in range(len(ep)-self.k):
+                    future_inds = R.sample(np.arange(tr_ind+1, len(ep), dtype="int").tolist(), self.k)
+                    modified_ep = []
+                    for ind in future_inds:
+                        s = ep[tr_ind].state
+                        dg = ep[ind].achieved_goal
+                        a = ep[tr_ind].action
+                        ns = ep[tr_ind].next_state
+                        ag = ep[tr_ind].achieved_goal
+                        r = goal_distance_reward(dg, ag)
+                        d = ep[tr_ind].done
+                        modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+                    self.episodes.append(modified_ep)
 
     def sample_achieved_goal(self, ep):
         goals = [[], []]
@@ -394,21 +394,21 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
         else:
             for _ in range(len(self.episodes)):
                 # 'future' strategy
-                # get a transition, and sample k achieved goals after that transition for replacement
+                # for eah transition, sample k achieved goals after that transition to replace the desired goal
                 ep = self.episodes[_]
-                transition_ind = R.randint(0, len(ep)-(self.k+1))
-                goal_inds = R.sample(np.arange(transition_ind+1, len(ep), dtype="int").tolist(), self.k)
-                modified_ep = []
-                for ind in goal_inds:
-                    s = ep[transition_ind].state
-                    dg = ep[ind].achieved_goal
-                    a = ep[transition_ind].action
-                    ns = ep[transition_ind].next_state
-                    ag = ep[transition_ind].achieved_goal
-                    r = goal_distance_reward(dg, ag)
-                    d = ep[transition_ind].done
-                    modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                self.episodes.append(modified_ep)
+                for tr_ind in range(len(ep)-self.k):
+                    future_inds = R.sample(np.arange(tr_ind+1, len(ep), dtype="int").tolist(), self.k)
+                    modified_ep = []
+                    for ind in future_inds:
+                        s = ep[tr_ind].state
+                        dg = ep[ind].achieved_goal
+                        a = ep[tr_ind].action
+                        ns = ep[tr_ind].next_state
+                        ag = ep[tr_ind].achieved_goal
+                        r = goal_distance_reward(dg, ag)
+                        d = ep[tr_ind].done
+                        modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+                    self.episodes.append(modified_ep)
 
     def sample_achieved_goal(self, ep):
         goals = [[], []]
