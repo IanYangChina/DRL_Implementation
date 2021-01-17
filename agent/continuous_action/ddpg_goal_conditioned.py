@@ -43,7 +43,7 @@ class GoalConditionedDDPG(Agent):
             'critic_2': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_2_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
         })
-        self.network_keys_to_save = ['actor_target', 'critic_target']
+        self.network_keys_to_save = ['actor_target', 'critic_1_target', 'critic_2_target']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
         self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
         self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
