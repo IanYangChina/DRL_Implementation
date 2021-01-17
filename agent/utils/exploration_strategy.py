@@ -48,26 +48,39 @@ class GoalSucRateBasedExpGreed(object):
 
 
 class ExpDecayGreedy(object):
-    def __init__(self, start=1, end=0.05, decay=50000, decay_start=None):
+    def __init__(self, start=1, end=0.05, decay=50000, decay_start=None, rng=None):
         self.start = start
         self.end = end
         self.decay = decay
         self.decay_start = decay_start
+        if rng is None:
+            self.rng = np.random.default_rng(seed=0)
+        else:
+            self.rng = rng
 
     def __call__(self, count):
         if self.decay_start is not None:
             count -= self.decay_start
             if count < 0:
                 count = 0
-        return self.end + (self.start - self.end) * M.exp(-1. * count / self.decay)
+        epsilon = self.end + (self.start - self.end) * M.exp(-1. * count / self.decay)
+        prob = self.rng.uniform(0, 1)
+        if prob < epsilon:
+            return True
+        else:
+            return False
 
 
 class LinearDecayGreedy(object):
-    def __init__(self, start=1.0, end=0.1, decay=1000000, decay_start=None):
+    def __init__(self, start=1.0, end=0.1, decay=1000000, decay_start=None, rng=None):
         self.start = start
         self.end = end
         self.decay = decay
         self.decay_start = decay_start
+        if rng is None:
+            self.rng = np.random.default_rng(seed=0)
+        else:
+            self.rng = rng
 
     def __call__(self, count):
         if self.decay_start is not None:
@@ -76,7 +89,12 @@ class LinearDecayGreedy(object):
                 count = 0
             if count > self.decay:
                 count = self.dacay
-        return self.start - count * (self.start - self.end) / self.decay
+        epsilon = self.start - count * (self.start - self.end) / self.decay
+        prob = self.rng.uniform(0, 1)
+        if prob < epsilon:
+            return True
+        else:
+            return False
 
 
 class ConstantChance(object):

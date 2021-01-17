@@ -47,7 +47,6 @@ class DDPG(Agent):
         self.exploration_strategy = GaussianNoise(self.action_dim, sigma=0.1)
         # training args
         self.warmup_step = algo_params['warmup_step']
-        self.update_interval = algo_params['update_interval']
         # statistic dict
         self.statistic_dict.update({
             'episode_return': [],

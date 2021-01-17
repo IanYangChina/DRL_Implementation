@@ -16,10 +16,19 @@ def mkdir(paths):
 
 
 class Agent(object):
-    def __init__(self, algo_params, transition_tuple=None, goal_conditioned=False, path=None, seed=-1):
+    def __init__(self,
+                 algo_params,
+                 transition_tuple=None,
+                 image_obs=False, action_type='continuous',
+                 goal_conditioned=False, path=None, seed=-1):
+        # torch device
+        self.device = T.device("cuda" if T.cuda.is_available() else "cpu")
+        if 'cuda_device_id' in algo_params.keys():
+            self.device = T.device("cuda:%i" % algo_params['cuda_device_id'])
         # path & seeding
         T.manual_seed(seed)
-        T.cuda.manual_seed_all(seed)  # this has no effect is cuda is not available
+        T.cuda.manual_seed_all(seed)  # this has no effect if cuda is not available
+
         # create a random number generator and seed it
         self.rng = np.random.default_rng(seed=seed)
         assert path is not None, 'please specify a project path to save files'
@@ -31,17 +40,22 @@ class Agent(object):
         # create directories if not exist
         mkdir([self.path, self.ckpt_path, self.data_path])
 
-        # torch device
-        self.device = T.device("cuda" if T.cuda.is_available() else "cpu")
-
         # non-goal-conditioned args
-        self.state_dim = algo_params['state_dim']
+        self.image_obs = image_obs
+        self.action_type = action_type
+        if self.image_obs:
+            self.state_dim = 0
+            self.state_shape = algo_params['state_shape']
+        else:
+            self.state_dim = algo_params['state_dim']
         self.action_dim = algo_params['action_dim']
-        self.action_max = algo_params['action_max']
-        self.action_scaling = algo_params['action_scaling']
-        self.prioritised = algo_params['prioritised']
+        if self.action_type == 'continuous':
+            self.action_max = algo_params['action_max']
+            self.action_scaling = algo_params['action_scaling']
 
-        # setup non-goal-conditioned transition tuple for replay buffer
+        # prioritised replay
+        self.prioritised = algo_params['prioritised']
+        # non-goal-conditioned replay buffer
         tr = transition_tuple
         if transition_tuple is None:
             tr = t
@@ -53,7 +67,10 @@ class Agent(object):
         # goal-conditioned args & buffers
         self.goal_conditioned = goal_conditioned
         if self.goal_conditioned:
-            self.goal_dim = algo_params['goal_dim']
+            if self.image_obs:
+                self.goal_shape = algo_params['goal_shape']
+            else:
+                self.goal_dim = algo_params['goal_dim']
             self.hindsight = algo_params['hindsight']
             if transition_tuple is None:
                 tr = t_goal
@@ -73,19 +90,22 @@ class Agent(object):
 
         # common args
         self.observation_normalization = algo_params['observation_normalization']
-        # if not using obs normalization, the normalizer is just an identity mapping
+        # if using image obs, normalizer returns inputs/255.
+        # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
         self.normalizer = Normalizer(self.state_dim+self.goal_dim,
                                      algo_params['init_input_means'], algo_params['init_input_vars'],
+                                     image_obs=self.image_obs,
                                      activated=self.observation_normalization)
         self.actor_learning_rate = algo_params['actor_learning_rate']
         self.critic_learning_rate = algo_params['critic_learning_rate']
+        self.update_interval = algo_params['update_interval']
         self.batch_size = algo_params['batch_size']
         self.optimizer_steps = algo_params['optimization_steps']
-        self.optim_step_count = 0
-        self.env_step_count = 0
         self.gamma = algo_params['discount_factor']
         self.discard_time_limit = algo_params['discard_time_limit']
         self.tau = algo_params['tau']
+        self.optim_step_count = 0
+        self.env_step_count = 0
 
         # network dict is filled in each specific agent
         self.network_dict = {}
@@ -138,8 +158,9 @@ class Agent(object):
             T.save(self.network_dict[key].state_dict(), self.ckpt_path+'/ckpt_'+key+ep+'.pt')
 
     def _load_network(self, keys=None, ep=None):
-        self.normalizer.history_mean = np.load(os.path.join(self.data_path, 'input_means.npy'))
-        self.normalizer.history_var = np.load(os.path.join(self.data_path, 'input_vars.npy'))
+        if not self.image_obs:
+            self.normalizer.history_mean = np.load(os.path.join(self.data_path, 'input_means.npy'))
+            self.normalizer.history_var = np.load(os.path.join(self.data_path, 'input_vars.npy'))
         if ep is None:
             ep = ''
         else:
@@ -151,8 +172,9 @@ class Agent(object):
             self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+'.pt'))
 
     def _save_statistics(self):
-        np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
-        np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
+        if not self.image_obs:
+            np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
+            np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
         json.dump(self.statistic_dict, open(os.path.join(self.data_path, 'statistics.json'), 'w'))
     
     def _plot_statistics(self, keys=None, x_labels=None, y_labels=None, window=5):
@@ -186,3 +208,8 @@ class Agent(object):
             for key in list(self.statistic_dict.keys()):
                 smoothed_plot(os.path.join(self.path, key+'.png'), self.statistic_dict[key],
                               x_label=x_labels[key], y_label=y_labels[key], window=window)
+        else:
+            for key in keys:
+                smoothed_plot(os.path.join(self.path, key+'.png'), self.statistic_dict[key],
+                              x_label=x_labels[key], y_label=y_labels[key], window=window)
+

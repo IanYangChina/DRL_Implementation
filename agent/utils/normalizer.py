@@ -2,7 +2,9 @@ import numpy as np
 
 
 class Normalizer(object):
-    def __init__(self, input_dims, init_mean, init_var, scale_factor=1, epsilon=1e-3, clip_range=None, activated=False):
+    def __init__(self, input_dims, init_mean, init_var,
+                 scale_factor=1, epsilon=1e-3, clip_range=None, image_obs=False, activated=False):
+        self.image_obs = image_obs
         self.activated = activated
         self.input_dims = input_dims
         self.sample_count = 0
@@ -46,6 +48,8 @@ class Normalizer(object):
 
     # pre-process inputs, currently using max-min-normalization
     def __call__(self, inputs):
+        if self.image_obs:
+            return inputs/255.
         if self.activated:
             inputs = (inputs - self.history_mean) / (self.history_var+self.epsilon)
             inputs = np.clip(inputs, self.input_clip_range[0], self.input_clip_range[1])

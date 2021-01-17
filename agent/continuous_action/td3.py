@@ -53,7 +53,6 @@ class TD3(Agent):
         self.target_noise = algo_params['target_noise']
         self.noise_clip = algo_params['noise_clip']
         self.warmup_step = algo_params['warmup_step']
-        self.update_interval = algo_params['update_interval']
         self.actor_update_interval = algo_params['actor_update_interval']
         # statistic dict
         self.statistic_dict.update({

@@ -13,8 +13,7 @@ Gym-like training environments as possible
 #### Algorithms: Flat
 - [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
 - [X] DDPG - Deterministic, Continuous
-- [ ] PPO - Stochastic, Continuous
-- [X] TD3 -Deterministic, Discrete
+- [X] TD3 -Deterministic, Continuous
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
 
 #### Algorithms: Distributed
@@ -31,7 +30,8 @@ Gym-like training environments as possible
 
 #### Tested Environments
 - [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal)
-- [X] OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous, Official)
+- [X] Pybullet Gym (Continuous)
+- [X] OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous)
 - [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics 
 Multigoal Pybullet Migration) (Continuous)
 - [X] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous)

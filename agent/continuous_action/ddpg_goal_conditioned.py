@@ -56,7 +56,6 @@ class GoalConditionedDDPG(Agent):
         self.exploration_strategy = ConstantChance(chance=algo_params['random_action_chance'], rng=self.rng)
         self.noise_deviation = algo_params['noise_deviation']
         # training args
-        self.update_interval = algo_params['update_interval']
         self.clip_value = algo_params['clip_value']
         # statistic dict
         self.statistic_dict.update({

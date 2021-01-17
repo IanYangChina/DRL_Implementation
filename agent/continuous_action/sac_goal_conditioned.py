@@ -52,7 +52,6 @@ class GoalConditionedSAC(Agent):
         self.target_entropy = -self.action_dim
         self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.actor_learning_rate)
         # training args
-        self.update_interval = algo_params['update_interval']
         self.actor_update_interval = algo_params['actor_update_interval']
         self.critic_target_update_interval = algo_params['critic_target_update_interval']
         # statistic dict
