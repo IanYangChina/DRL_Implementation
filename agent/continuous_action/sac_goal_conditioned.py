@@ -85,7 +85,6 @@ class GoalConditionedSAC(Agent):
                     cycle_return += ep_return
                     if ep_return > -50:
                         cycle_success += 1
-                self._learn()
 
                 self.statistic_dict['cycle_return'].append(cycle_return / self.training_episodes)
                 self.statistic_dict['cycle_success_rate'].append(cycle_success / self.training_episodes)
@@ -138,6 +137,7 @@ class GoalConditionedSAC(Agent):
             obs = new_obs
             new_episode = False
         self.normalizer.update_mean()
+        self._learn()
         return ep_return
 
     def _select_action(self, obs, test=False):

@@ -78,12 +78,14 @@ class Agent(object):
                 self.buffer = HindsightReplayBuffer(algo_params['memory_capacity'], tr,
                                                     sampling_strategy=algo_params['her_sampling_strategy'],
                                                     sampled_goal_num=4,
+                                                    terminate_on_achieve=algo_params['terminate_on_achieve'],
                                                     seed=seed)
             else:
                 self.buffer = PrioritisedHindsightReplayBuffer(algo_params['memory_capacity'],
                                                                tr,
                                                                sampling_strategy=algo_params['her_sampling_strategy'],
                                                                sampled_goal_num=4,
+                                                               terminate_on_achieve=algo_params['terminate_on_achieve'],
                                                                rng=self.rng)
         else:
             self.goal_dim = 0

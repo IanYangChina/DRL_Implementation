@@ -15,6 +15,7 @@ algo_params = {
     'tau': 0.005,
     'discount_factor': 0.98,
     'discard_time_limit': True,
+    'terminate_on_achieve': False,
     'observation_normalization': True,
 
     'alpha': 0.5,

@@ -102,10 +102,13 @@ class EpisodeWiseReplayBuffer(object):
 
 
 class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, sampling_strategy='future', sampled_goal_num=6, seed=0):
+    def __init__(self, capacity, tr_namedtuple,
+                 sampling_strategy='future', sampled_goal_num=6, terminate_on_achieve=False,
+                 seed=0):
         self.sampling_strategy = sampling_strategy
         assert self.sampling_strategy in ['final', 'episode', 'future']
         self.k = sampled_goal_num
+        self.terminate_on_achieve = terminate_on_achieve
         EpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
     def modify_episodes(self):
@@ -127,7 +130,10 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         ns = ep[tr].next_state
                         ag = ep[tr].achieved_goal
                         r = goal_distance_reward(dg, ag)
-                        d = ep[tr].done
+                        if self.terminate_on_achieve:
+                            d = 0 if r == 0.0 else 1
+                        else:
+                            d = ep[tr].done
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                     self.episodes.append(modified_ep)
         else:
@@ -145,7 +151,10 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         ns = ep[tr_ind].next_state
                         ag = ep[tr_ind].achieved_goal
                         r = goal_distance_reward(dg, ag)
-                        d = ep[tr_ind].done
+                        if self.terminate_on_achieve:
+                            d = 0 if r == 0.0 else 1
+                        else:
+                            d = ep[tr_ind].done
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                     self.episodes.append(modified_ep)
 
@@ -362,11 +371,12 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
 
 class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8,
-                 sampling_strategy='future', sampled_goal_num=4,
+                 sampling_strategy='future', sampled_goal_num=4, terminate_on_achieve=False,
                  rng=None):
         self.sampling_strategy = sampling_strategy
         assert self.sampling_strategy in ['final', 'episode', 'future']
         self.k = sampled_goal_num
+        self.terminate_on_achieve = terminate_on_achieve
         PrioritisedEpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, alpha=alpha, beta=beta, rng=rng)
 
     def modify_episodes(self):
@@ -388,7 +398,10 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                         ns = ep[tr].next_state
                         ag = ep[tr].achieved_goal
                         r = goal_distance_reward(dg, ag)
-                        d = ep[tr].done
+                        if self.terminate_on_achieve:
+                            d = 0 if r == 0.0 else 1
+                        else:
+                            d = ep[tr].done
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                     self.episodes.append(modified_ep)
         else:
@@ -406,7 +419,10 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                         ns = ep[tr_ind].next_state
                         ag = ep[tr_ind].achieved_goal
                         r = goal_distance_reward(dg, ag)
-                        d = ep[tr_ind].done
+                        if self.terminate_on_achieve:
+                            d = 0 if r == 0.0 else 1
+                        else:
+                            d = ep[tr_ind].done
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                     self.episodes.append(modified_ep)
 

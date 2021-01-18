@@ -17,6 +17,7 @@ algo_params = {
     'discount_factor': 0.98,
     'clip_value': 50,
     'discard_time_limit': True,
+    'terminate_on_achieve': False,
     'observation_normalization': True,
 
     'random_action_chance': 0.2,
