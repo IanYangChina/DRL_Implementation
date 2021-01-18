@@ -26,7 +26,7 @@ class DQN(Agent):
         # training args
         self.training_epoch = algo_params['training_epoch']
         self.training_frame_per_epoch = algo_params['training_frame_per_epoch']
-        self.printing_gap = int(self.training_frame_per_epoch / 100)
+        self.printing_gap = algo_params['printing_gap']
         self.testing_gap = algo_params['testing_gap']
         self.testing_frame_per_epoch = algo_params['testing_frame_per_epoch']
         self.saving_gap = algo_params['saving_gap']
@@ -61,7 +61,7 @@ class DQN(Agent):
         self.warmup_step = algo_params['warmup_step']
         self.Q_target_update_interval = algo_params['Q_target_update_interval']
         self.last_frame = None
-        self.frame_buffer = []
+        self.frame_buffer = [None, None, None, None]
         self.frame_count = 0
         self.reward_clip = algo_params['reward_clip']
         # statistic dict
@@ -120,15 +120,15 @@ class DQN(Agent):
                 else:
                     action = self._select_action(obs, test=test)
 
-                # action repeat, frame stack, aggregated reward
+                # action repeat, aggregated reward
                 frames = []
                 added_reward = 0
                 for _ in range(self.frame_skip):
-                    self.frame_count += 1
                     new_obs, reward, done, info = self.env.step(action)
                     frames.append(new_obs.copy())
                     added_reward += reward
-                new_obs = self._pre_process(frames)
+                # frame gray scale, resize, stack
+                new_obs = self._pre_process(frames[-2:])
                 # reward clipped into [-1, 1]
                 reward = max(min(added_reward, self.reward_clip), -self.reward_clip)
 
@@ -139,8 +139,7 @@ class DQN(Agent):
                     # set the reward to be -reward_bound
                     reward = -self.reward_clip
                     # clear frame buffer when the agent starts with a new live
-                    self.frame_buffer.clear()
-                    self.last_frame = None
+                    self.frame_buffer = [None, None, None, None]
                 else:
                     done_to_save = done
 
@@ -151,13 +150,14 @@ class DQN(Agent):
                     if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                         self._learn()
                 obs = new_obs
+                self.frame_count += 1
                 self.env_step_count += 1
 
                 if self.frame_count % self.printing_gap == 0 and self.frame_count != 0:
                     print("Epoch %i" % epo, "passed frames %i" % self.frame_count, "return %0.1f" % ep_return)
 
             # clear frame buffer at the end of an episode
-            self.frame_buffer.clear()
+            self.frame_buffer = [None, None, None, None]
         return ep_return
 
     def _select_action(self, obs, test=False):
@@ -221,26 +221,36 @@ class DQN(Agent):
             self.optim_step_count += 1
 
     def _pre_process(self, frames):
-        # This method takes a list of frames and does the following things
+        # This method takes 2 frames and does the following things
         # 1. Max-pool two consecutive frames to deal with flickering
         # 2. Convert images to Y channel: Y = 0.299*R + 0.587*G + (1 - (0.299 + 0.587))*B
         # 3. Resize images to 84x84
-        # 4. Stack 4 (skipped frames) images as one observation
-        if self.last_frame is None:
-            self.last_frame = np.zeros(self.original_image_shape)
-        if len(self.frame_buffer) < 4:
-            for _ in range(4-len(self.frame_buffer)):
-                self.frame_buffer.append(np.zeros((self.image_size, self.image_size)))
+        # 4. Stack it with previous frames as one observation
+        # output: 1000, 1200, 1230, 1234, 2345, 3456...
+        if len(frames) == 1:
+            frames.insert(0, np.zeros(self.original_image_shape))
+        assert len(frames) == 2
 
-        for i in range(len(frames)):
-            img = frames[i].copy()
-            last_img = self.last_frame.copy()
-            self.last_frame = img.copy()
-            img = np.max([last_img, img], axis=0)
-            img = img.transpose((-1, 0, 1))
-            img_Y = 0.299 * img[0] + 0.587 * img[1] + (1 - (0.299 + 0.587)) * img[2]
-            img_Y_resized = np.asarray(
-                Image.fromarray(img_Y).resize((self.image_size, self.image_size), Image.BILINEAR))
-            self.frame_buffer[i] = img_Y_resized.copy()
+        last_img = frames[0].copy()
+        img = frames[1].copy()
+        img = np.max([last_img, img], axis=0)
+        img = img.transpose((-1, 0, 1))
+        img_Y = 0.299 * img[0] + 0.587 * img[1] + (1 - (0.299 + 0.587)) * img[2]
+        img_Y_resized = np.asarray(
+            Image.fromarray(img_Y).resize((self.image_size, self.image_size), Image.BILINEAR))
+        for i in range(len(self.frame_buffer)):
+            if self.frame_buffer[i] is None:
+                self.frame_buffer[i] = img_Y_resized.copy()
+                break
 
-        return np.array(self.frame_buffer, dtype=np.uint8)
+            if i == (len(self.frame_buffer)-1):
+                del self.frame_buffer[0]
+                self.frame_buffer.append(img_Y_resized.copy())
+
+        obs = []
+        for i in range(len(self.frame_buffer)):
+            if self.frame_buffer[i] is not None:
+                obs.append(self.frame_buffer[i].copy())
+            else:
+                obs.append(np.zeros((self.image_size, self.image_size)))
+        return np.array(obs, dtype=np.uint8)
