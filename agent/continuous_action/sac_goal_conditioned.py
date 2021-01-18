@@ -12,6 +12,7 @@ class GoalConditionedSAC(Agent):
         self.env = env
         self.env.seed(seed)
         obs = self.env.reset()
+        print(obs['state'].shape)
         algo_params.update({'state_dim': obs['state'].shape[0],
                             'goal_dim': obs['desired_goal'].shape[0],
                             'action_dim': self.env.action_space.shape[0],
