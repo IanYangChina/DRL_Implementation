@@ -22,7 +22,7 @@ algo_params = {
     'actor_update_interval': 1,
     'critic_target_update_interval': 1,
 
-    'training_epochs': 51,
+    'training_epochs': 61,
     'training_cycles': 50,
     'training_episodes': 16,
     'testing_gap': 1,
