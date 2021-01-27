@@ -23,14 +23,14 @@ algo_params = {
     'actor_update_interval': 1,
     'critic_target_update_interval': 1,
 
-    'training_epochs': 151,
+    'training_epochs': 101,
     'training_cycles': 50,
     'training_episodes': 16,
     'testing_gap': 1,
     'testing_episodes': 30,
-    'saving_gap': 50,
+    'saving_gap': 25,
 }
-seeds = [11, 22]
+seeds = [11, 22, 33, 44]
 seed_returns = []
 seed_success_rates = []
 path = os.path.dirname(os.path.realpath(__file__))
