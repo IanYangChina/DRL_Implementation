@@ -1,0 +1,5 @@
+PIL
+matplotlib >= 3.3.2
+numpy >= 1.18
+pytorch >= 1.7.0
+json

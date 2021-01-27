@@ -1,45 +1,48 @@
 ## DRL_Implementation
-#### Current status: under development  
-#### Important: the project is undergoing an code structure overhaul, use with caution
+##### Current status: under development
 
-#### Introduction
+### Introduction
 - This repository is a pytorch-based implementation of modern DRL algorithms, designed to be reusable for as many 
 Gym-like training environments as possible
 - The package is under-development, plan to release the first version before April 2021.
-- Language: Python >= 3.6
-- Main library: PyTorch-1.3.0
 - Tested environments: Gym, Pybullet-gym, Pybullet-multigoal-gym
 
-#### Algorithms: Flat
+#### Installation
+`git clone https://github.com/IanYangChina/DRL_Implementation.git` \
+`cd DRL_Implementation` \
+`python -m pip install -r requirements.txt`\
+`python -m pip install .` \
+[Click here for example codes](https://github.com/IanYangChina/DRL_Implementation/tree/master/drl_implementation/examples)
+, to run the codes you will need to install Gym, Pybullet, or pybullet-multigoal-gym. See links below.\
+From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
+
+##### Algorithms: Flat
 - [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
 - [X] DDPG - Deterministic, Continuous
 - [X] TD3 -Deterministic, Continuous
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
 
-#### Algorithms: Distributed
+##### Algorithms: Distributed
 - [ ] D4PG - Deterministic, Continuous
 - [ ] R2D2 - Deterministic, Discrete
 
-#### Algorithms: Hierarchical
+##### Algorithms: Hierarchical
 - [ ] HIRO - Hindsight, Deterministic, Continuous
 - [ ] HAC - Hindsight, Deterministic, Continuous
 
-#### Replay buffers
+##### Replay buffers
 - [X] Hindsight
 - [X] Prioritised
 
-#### Tested Environments
-- [X] GridWorld_MultiRoomKeyDoor (Discrete, Multi-goal)
-- [X] Pybullet Gym (Continuous)
+##### Tested Environments
+- [X] [Pybullet Gym (Continuous)](https://github.com/bulletphysics/bullet3)
 - [X] OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous)
 - [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics 
 Multigoal Pybullet Migration) (Continuous)
 - [X] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous)
 
-#### Some result figures
-<img src="/src/returns_pybullet_kuka_reach.png" width="350"/>
-<img src="/src/returns_half_cheetah.png" width="350"/>
-<img src="/src/returns_pendulum.png" width="350"/>
+##### Some result figures
+<img src="/src/figs.png" width="600"/>
 
 #### Reference Papers: Algorithm
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)
