@@ -13,6 +13,7 @@ algo_params = {
     'batch_size': 128,
     'optimization_steps': 40,
     'tau': 0.005,
+    'clip_value': 50,
     'discount_factor': 0.98,
     'discard_time_limit': True,
     'terminate_on_achieve': False,
@@ -22,7 +23,7 @@ algo_params = {
     'actor_update_interval': 1,
     'critic_target_update_interval': 1,
 
-    'training_epochs': 201,
+    'training_epochs': 151,
     'training_cycles': 50,
     'training_episodes': 16,
     'testing_gap': 1,

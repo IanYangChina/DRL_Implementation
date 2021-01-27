@@ -53,6 +53,7 @@ class GoalConditionedSAC(Agent):
         self.target_entropy = -self.action_dim
         self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.actor_learning_rate)
         # training args
+        self.clip_value = algo_params['clip_value']
         self.actor_update_interval = algo_params['actor_update_interval']
         self.critic_target_update_interval = algo_params['critic_target_update_interval']
         # statistic dict
@@ -111,7 +112,12 @@ class GoalConditionedSAC(Agent):
             print("Finished training")
             print("Saving statistics...")
             self._save_statistics()
-            self._plot_statistics()
+            self._plot_statistics(x_labels={
+                'critic_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
+                'actor_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
+                'alpha': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
+                'policy_entropy': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)'
+            })
         else:
             print("Finished testing")
 
@@ -155,6 +161,10 @@ class GoalConditionedSAC(Agent):
         if steps is None:
             steps = self.optimizer_steps
 
+        critic_losses = []
+        actor_losses = []
+        alphas = []
+        policy_entropies = []
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
@@ -185,6 +195,7 @@ class GoalConditionedSAC(Agent):
                 value_2_ = self.network_dict['critic_2_target'](critic_inputs_)
                 value_ = T.min(value_1_, value_2_) - (self.network_dict['alpha'] * log_probs_)
                 value_target = rewards + done * self.gamma * value_
+                value_target = T.clamp(value_target, -self.clip_value, 0.0)
 
             self.critic_1_optimizer.zero_grad()
             value_estimate_1 = self.network_dict['critic_1'](critic_inputs)
@@ -202,7 +213,7 @@ class GoalConditionedSAC(Agent):
             (critic_loss_2 * weights).mean().backward()
             self.critic_2_optimizer.step()
 
-            self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
+            critic_losses.append(critic_loss_1.detach().mean().cpu().numpy().item())
 
             if self.optim_step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
@@ -210,7 +221,7 @@ class GoalConditionedSAC(Agent):
 
             if self.optim_step_count % self.actor_update_interval == 0:
                 self.actor_optimizer.zero_grad()
-                new_actions, new_log_probs = self.network_dict['actor'].get_action(actor_inputs, probs=True)
+                new_actions, new_log_probs, entropy = self.network_dict['actor'].get_action(actor_inputs, probs=True, entropy=True)
                 critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
                 new_values = T.min(self.network_dict['critic_1'](critic_eval_inputs),
                                    self.network_dict['critic_2'](critic_eval_inputs))
@@ -224,8 +235,13 @@ class GoalConditionedSAC(Agent):
                 self.alpha_optimizer.step()
                 self.network_dict['alpha'] = self.network_dict['log_alpha'].exp()
 
-                self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
-                self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
-                self.statistic_dict['policy_entropy'].append(-new_log_probs.detach().mean().cpu().numpy().item())
+                actor_losses.append(actor_loss.detach().mean().cpu().numpy().item())
+                alphas.append(self.network_dict['alpha'].detach().cpu().numpy().item())
+                policy_entropies.append(entropy.detach().mean().cpu().numpy().item())
 
             self.optim_step_count += 1
+
+        self.statistic_dict['critic_loss'].append(np.mean(critic_losses))
+        self.statistic_dict['actor_loss'].append(np.mean(actor_losses))
+        self.statistic_dict['alpha'].append(np.mean(alphas))
+        self.statistic_dict['policy_entropy'].append(np.mean(policy_entropies))

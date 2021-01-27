@@ -112,7 +112,10 @@ class GoalConditionedDDPG(Agent):
             print("Finished training")
             print("Saving statistics...")
             self._save_statistics()
-            self._plot_statistics()
+            self._plot_statistics(x_labels={
+                'critic_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
+                'actor_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)'
+            })
         else:
             print("Finished testing")
 
@@ -170,6 +173,8 @@ class GoalConditionedDDPG(Agent):
         if steps is None:
             steps = self.optimizer_steps
 
+        critic_losses = []
+        actor_losses = []
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
@@ -227,9 +232,12 @@ class GoalConditionedDDPG(Agent):
             actor_loss.backward()
             self.actor_optimizer.step()
 
-            self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
-            self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
+            critic_losses.append(critic_loss_1.detach().mean().cpu().numpy().item())
+            actor_losses.append(actor_loss.detach().mean().cpu().numpy().item())
 
             self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
             self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
             self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'])
+
+        self.statistic_dict['critic_loss'].append(np.mean(critic_losses))
+        self.statistic_dict['actor_loss'].append(np.mean(actor_losses))
