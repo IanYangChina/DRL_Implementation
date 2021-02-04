@@ -6,6 +6,7 @@
 Gym-like training environments as possible
 - The package is under-development, plan to release the first version before April 2021.
 - Tested environments: Gym, Pybullet-gym, Pybullet-multigoal-gym
+- *My priority is on continuous action algorithms as I'm working on robotics*
 
 #### Installation
 `git clone https://github.com/IanYangChina/DRL_Implementation.git` \
@@ -13,7 +14,8 @@ Gym-like training environments as possible
 `python -m pip install -r requirements.txt`\
 `python -m pip install .` \
 [Click here for example codes](https://github.com/IanYangChina/DRL_Implementation/tree/master/drl_implementation/examples)
-, to run the codes you will need to install Gym, Pybullet, or pybullet-multigoal-gym. See links below.\
+, to run the codes you will need to install Gym, Pybullet, or pybullet-multigoal-gym. See env installation links below.
+For more use cases, have a look at the [drl_imp_test repo](https://github.com/IanYangChina/drl_imp_test)\
 From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 
 ##### Algorithms: Flat
@@ -27,8 +29,8 @@ From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 - [ ] R2D2 - Deterministic, Discrete
 
 ##### Algorithms: Hierarchical
-- [ ] HIRO - Hindsight, Deterministic, Continuous
 - [ ] HAC - Hindsight, Deterministic, Continuous
+- [ ] UOF - Hindsight, Deterministic, Continuous
 
 ##### Replay buffers
 - [X] Hindsight
@@ -53,7 +55,6 @@ Multigoal Pybullet Migration) (Continuous)
 * [SAC (Adaptive Temperature)](https://arxiv.org/pdf/1812.05905.pdf)
 * [PER](https://arxiv.org/abs/1511.05952)
 * [HER](http://papers.nips.cc/paper/7090-hindsight-experience-replay)
-* [HIRO](http://papers.nips.cc/paper/7591-data-efficient-hierarchical-reinforcement-learning.pdf)
 * [HAC](https://arxiv.org/abs/1712.00948)
 * [OptionFramework](https://www.sciencedirect.com/science/article/pii/S0004370299000521)
 * [D4PG](https://arxiv.org/abs/1804.08617)

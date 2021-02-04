@@ -6,7 +6,7 @@ import gym
 import pybullet_multigoal_gym as pmg
 from drl_implementation import GoalConditionedSAC, GoalConditionedDDPG
 # you can replace the agent instantiation by one of the two above, with the proper params
-from drl_implementation.agent.utils import plot
+
 # ddpg_params = {
 #     'hindsight': True,
 #     'her_sampling_strategy': 'future',
@@ -71,7 +71,7 @@ path = os.path.join(path, 'Slide_PHER')
 
 for seed in seeds:
 
-    env = pmg.make('KukaParallelGripSlideSparseEnv-v0')
+    env = pmg.make('KukaParallelGripPushSparseEnv-v0')
     # env = gym.make('FetchReach-v1')
 
     seed_path = path + '/seed'+str(seed)
@@ -80,14 +80,3 @@ for seed in seeds:
     agent.run(test=False)
     seed_returns.append(agent.statistic_dict['epoch_test_return'])
     seed_success_rates.append(agent.statistic_dict['epoch_test_success_rate'])
-    del env, agent
-
-return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
-                                               file_name=os.path.join(path, 'return_statistic.json'))
-plot.smoothed_plot_mean_deviation(path + '/returns.png', return_statistic, x_label='Epoch', y_label='Average returns')
-
-
-success_rate_statistic = plot.get_mean_and_deviation(seed_success_rates, save_data=True,
-                                                     file_name=os.path.join(path, 'success_rate_statistic.json'))
-plot.smoothed_plot_mean_deviation(path + '/success_rates.png', success_rate_statistic,
-                                  x_label='Epoch', y_label='Success rates')

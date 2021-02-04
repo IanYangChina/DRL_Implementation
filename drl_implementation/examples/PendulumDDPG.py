@@ -4,7 +4,7 @@ import os
 import pybullet_envs
 from drl_implementation import DDPG, SAC, TD3
 # you can replace the agent instantiation by one of the three above, with the proper params
-from drl_implementation.agent.utils import plot
+
 # td3_params = {
 #     'prioritised': True,
 #     'memory_capacity': int(1e6),
@@ -76,7 +76,6 @@ path = os.path.dirname(os.path.realpath(__file__))
 for seed in seeds:
 
     env = pybullet_envs.make("InvertedPendulumSwingupBulletEnv-v0")
-    # env.render()
 
     seed_path = path + '/seed'+str(seed)
 
@@ -84,7 +83,3 @@ for seed in seeds:
     agent.run(test=False)
     seed_returns.append(agent.statistic_dict['episode_return'])
     del env, agent
-
-return_statistic = plot.get_mean_and_deviation(seed_returns, save_data=True,
-                                               file_name=os.path.join(path, 'return_statistic.json'))
-plot.smoothed_plot_mean_deviation(path + '/returns.png', return_statistic, x_label='Episode', y_label='Average returns')

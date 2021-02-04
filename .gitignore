@@ -1,10 +1,6 @@
 # Default ignored files
 .idea
 __pycache__/
-agent/__pycache__/
-agent/utils/__pycache__/
-envs/__pycache__/
-exp_atari/__pycache__/
-exp_continuous_gym/__pycache__/
-exp_gridworld/__pycache__/
+drl_implementation/agent/__pycache__/
+drl_implementation/agent/utils/__pycache__/
 exp_multi_goal/__pycache__/

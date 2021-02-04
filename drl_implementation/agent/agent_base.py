@@ -182,31 +182,31 @@ class Agent(object):
     def _plot_statistics(self, keys=None, x_labels=None, y_labels=None, window=5):
         if y_labels is None:
             y_labels = {}
-            for key in list(self.statistic_dict.keys()):
-                if key not in y_labels.keys():
-                    if 'loss' in key:
-                        label = 'Loss'
-                    elif 'return' in key:
-                        label = 'Return'
-                    elif 'success' in key:
-                        label = 'Success'
-                    else:
-                        label = key
-                    y_labels.update({key: label})
+        for key in list(self.statistic_dict.keys()):
+            if key not in y_labels.keys():
+                if 'loss' in key:
+                    label = 'Loss'
+                elif 'return' in key:
+                    label = 'Return'
+                elif 'success' in key:
+                    label = 'Success'
+                else:
+                    label = key
+                y_labels.update({key: label})
         
         if x_labels is None:
             x_labels = {}
-            for key in list(self.statistic_dict.keys()):
-                if key not in x_labels.keys():
-                    if ('loss' in key) or ('alpha' in key) or ('entropy' in key):
-                        label = 'Optimization step'
-                    elif 'cycle' in key:
-                        label = 'Cycle'
-                    elif 'epoch' in key:
-                        label = 'Epoch'
-                    else:
-                        label = 'Episode'
-                    x_labels.update({key: label})
+        for key in list(self.statistic_dict.keys()):
+            if key not in x_labels.keys():
+                if ('loss' in key) or ('alpha' in key) or ('entropy' in key):
+                    label = 'Optimization step'
+                elif 'cycle' in key:
+                    label = 'Cycle'
+                elif 'epoch' in key:
+                    label = 'Epoch'
+                else:
+                    label = 'Episode'
+                x_labels.update({key: label})
         
         if keys is None:
             for key in list(self.statistic_dict.keys()):
