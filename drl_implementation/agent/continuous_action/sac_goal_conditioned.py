@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch as T
 import torch.nn.functional as F
@@ -66,7 +67,7 @@ class GoalConditionedSAC(Agent):
             'policy_entropy': [],
         })
 
-    def run(self, test=False, render=False, load_network_ep=None):
+    def run(self, test=False, render=False, load_network_ep=None, sleep=0):
         # training setup uses a hierarchy of Epoch, Cycle and Episode
         #   following the HER paper: https://papers.nips.cc/paper/2017/hash/453fadbd8a1a3af50a9df4df899537b5-Abstract.html
         if test:
@@ -82,7 +83,7 @@ class GoalConditionedSAC(Agent):
                 cycle_return = 0
                 cycle_success = 0
                 for ep in range(self.training_episodes):
-                    ep_return = self._interact(render, test)
+                    ep_return = self._interact(render, test, sleep=sleep)
                     cycle_return += ep_return
                     if ep_return > -50:
                         cycle_success += 1
@@ -121,7 +122,7 @@ class GoalConditionedSAC(Agent):
         else:
             print("Finished testing")
 
-    def _interact(self, render=False, test=False):
+    def _interact(self, render=False, test=False, sleep=0):
         done = False
         obs = self.env.reset()
         ep_return = 0
@@ -132,6 +133,7 @@ class GoalConditionedSAC(Agent):
                 self.env.render()
             action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
+            time.sleep(sleep)
             ep_return += reward
             if not test:
                 self._remember(obs['state'], obs['desired_goal'], action,

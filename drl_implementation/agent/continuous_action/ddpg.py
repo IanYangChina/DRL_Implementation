@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch as T
 import torch.nn.functional as F
@@ -53,7 +54,7 @@ class DDPG(Agent):
             'episode_test_return': []
         })
 
-    def run(self, test=False, render=False, load_network_ep=None):
+    def run(self, test=False, render=False, load_network_ep=None, sleep=0):
         if test:
             num_episode = self.testing_episodes
             if load_network_ep is not None:
@@ -65,7 +66,7 @@ class DDPG(Agent):
             print("Start training...")
 
         for ep in range(num_episode):
-            ep_return = self._interact(render, test)
+            ep_return = self._interact(render, test, sleep=sleep)
             self.statistic_dict['episode_return'].append(ep_return)
             print("Episode %i" % ep, "return %0.1f" % ep_return)
 
@@ -87,7 +88,7 @@ class DDPG(Agent):
         else:
             print("Finished testing")
 
-    def _interact(self, render=False, test=False):
+    def _interact(self, render=False, test=False, sleep=0):
         done = False
         obs = self.env.reset()
         ep_return = 0
@@ -101,6 +102,7 @@ class DDPG(Agent):
             else:
                 action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
+            time.sleep(sleep)
             ep_return += reward
             if not test:
                 self._remember(obs, action, new_obs, reward, 1 - int(done))

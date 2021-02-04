@@ -1,13 +1,10 @@
-import os
 from setuptools import setup, find_packages
 
 
 packages = find_packages()
-packages_to_install = []
 # Ensure that we don't pollute the global namespace.
 for p in packages:
-    if 'drl_implementation' in p:
-        packages_to_install.append(p)
+    assert p == 'drl_implementation' or p.startswith('drl_implementation.')
 
 setup(name='drl-implementation',
       version='1.0.0',

@@ -72,11 +72,15 @@ path = os.path.join(path, 'Slide_PHER')
 for seed in seeds:
 
     env = pmg.make('KukaParallelGripPushSparseEnv-v0')
+    # use the render env for visualization
+    # env = pmg.make("KukaParallelGripPushRenderSparseEnv-v0")
     # env = gym.make('FetchReach-v1')
 
     seed_path = path + '/seed'+str(seed)
 
     agent = GoalConditionedSAC(algo_params=sac_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
+    # the sleep argument pause the rendering for a while every step, useful for slowing down visualization
+    # agent.run(test=True, load_network_ep=50, sleep=0.05)
     seed_returns.append(agent.statistic_dict['epoch_test_return'])
     seed_success_rates.append(agent.statistic_dict['epoch_test_success_rate'])

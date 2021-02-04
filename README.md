@@ -45,6 +45,8 @@ Multigoal Pybullet Migration) (Continuous)
 
 ##### Some result figures
 <img src="/src/figs.png" width="600"/>
+<img src="/src/push.gif" width="600"/>
+<img src="/src/pendulum.gif" width="600"/>
 
 #### Reference Papers: Algorithm
 * [DQN](https://www.nature.com/articles/nature14236?wm=book_wap_0005)

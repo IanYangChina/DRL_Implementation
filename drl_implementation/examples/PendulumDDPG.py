@@ -76,10 +76,13 @@ path = os.path.dirname(os.path.realpath(__file__))
 for seed in seeds:
 
     env = pybullet_envs.make("InvertedPendulumSwingupBulletEnv-v0")
-
+    # call render() before training to visualize (pybullet-gym-specific)
+    env.render()
     seed_path = path + '/seed'+str(seed)
 
     agent = DDPG(algo_params=ddpg_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    seed_returns.append(agent.statistic_dict['episode_return'])
+    # the sleep argument pause the rendering for a while every step, useful for slowing down visualization
+    # agent.run(test=True, load_network_ep=50, sleep=0.05)
+    seed_returns.append(agent.statistic_dict['episode_retupush.gifrn'])
     del env, agent

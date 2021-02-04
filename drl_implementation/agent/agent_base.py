@@ -120,10 +120,10 @@ class Agent(object):
             'critic_loss': [],
         }
 
-    def run(self, render=False, test=False, load_network_ep=None):
+    def run(self, render=False, test=False, load_network_ep=None, sleep=0):
         raise NotImplementedError()
 
-    def _interact(self, render=False, test=False):
+    def _interact(self, render=False, test=False, sleep=0):
         raise NotImplementedError()
 
     def _select_action(self, obs, test=False):
