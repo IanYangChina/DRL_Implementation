@@ -1,5 +1,5 @@
 # this example runs a goal-condition soft actor critic with prioritised+hindsight experience replay
-#       on the Slide task via the pybullet-multigoal-gym package
+#       on the Push task from the pybullet-multigoal-gym package
 
 import os
 import gym

@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch as T
 import torch.nn.functional as F
@@ -70,7 +71,7 @@ class DQN(Agent):
             'epoch_test_return': []
         })
 
-    def run(self, test=False, render=False, load_network_ep=None):
+    def run(self, test=False, render=False, load_network_ep=None, sleep=0):
         if test:
             num_frames = self.testing_frame_per_epoch
             if load_network_ep is not None:
@@ -82,7 +83,7 @@ class DQN(Agent):
             print("Start training...")
 
         for epo in range(self.training_epoch):
-            ep_return = self._interact(render, test, epo=epo, num_frames=num_frames)
+            ep_return = self._interact(render, test, epo=epo, num_frames=num_frames, sleep=sleep)
             self.statistic_dict['epoch_return'].append(ep_return)
             print("Finished training epoch %i, " % epo, "full return %0.1f" % ep_return)
 
@@ -103,7 +104,7 @@ class DQN(Agent):
         else:
             print("Finished testing")
 
-    def _interact(self, render=False, test=False, epo=0, num_frames=0):
+    def _interact(self, render=False, test=False, epo=0, num_frames=0, sleep=0):
         ep_return = 0
         self.frame_count = 0
         while self.frame_count < num_frames:
@@ -127,6 +128,7 @@ class DQN(Agent):
                     new_obs, reward, done, info = self.env.step(action)
                     frames.append(new_obs.copy())
                     added_reward += reward
+                time.sleep(sleep)
                 # frame gray scale, resize, stack
                 new_obs = self._pre_process(frames[-2:])
                 # reward clipped into [-1, 1]

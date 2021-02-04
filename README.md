@@ -4,7 +4,8 @@
 ### Introduction
 - This repository is a pytorch-based implementation of modern DRL algorithms, designed to be reusable for as many 
 Gym-like training environments as possible
-- The package is under-development, plan to release the first version before April 2021.
+- The package is under active development, use the latest version with caution
+- It is recommended to use the [released version](https://github.com/IanYangChina/DRL_Implementation/releases/tag/v1.0)
 - Tested environments: Gym, Pybullet-gym, Pybullet-multigoal-gym
 - *My priority is on continuous action algorithms as I'm working on robotics*
 

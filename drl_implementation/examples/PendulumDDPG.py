@@ -82,7 +82,7 @@ for seed in seeds:
 
     agent = DDPG(algo_params=ddpg_params, env=env, path=seed_path, seed=seed)
     agent.run(test=False)
-    # the sleep argument pause the rendering for a while every step, useful for slowing down visualization
+    # the sleep argument pause the rendering for a while at every env step, useful for slowing down visualization
     # agent.run(test=True, load_network_ep=50, sleep=0.05)
-    seed_returns.append(agent.statistic_dict['episode_retupush.gifrn'])
+    seed_returns.append(agent.statistic_dict['episode_return'])
     del env, agent
