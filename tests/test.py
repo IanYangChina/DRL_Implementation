@@ -3,6 +3,7 @@ import drl_implementation
 
 algo_params = {
     'prioritised': True,
+    'store_with_given_priority': False,
     'memory_capacity': int(1e6),
     'actor_learning_rate': 0.001,
     'critic_learning_rate': 0.001,

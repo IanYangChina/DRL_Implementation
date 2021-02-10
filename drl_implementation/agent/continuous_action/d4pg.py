@@ -52,6 +52,8 @@ class D4PGWorker(Worker):
         })
         self.network_keys_to_save = ['actor_target', 'critic_target']
 
+        # whether to store transition with pre-computed td-error or not
+        self.store_with_given_priority = algo_params['store_with_given_priority']
         # make sure the worker networks are synced with the initial learner
         synced = False
         while not synced:
@@ -100,22 +102,25 @@ class D4PGWorker(Worker):
             time.sleep(sleep)
             ep_return += reward
             if not test:
-                # compute td-error using local network for better initial priority
-                # see: https://arxiv.org/pdf/1803.00933.pdf
-                with T.no_grad():
-                    critic_input = T.from_numpy(np.concatenate((obs, action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
-                    new_action = self.network_dict['actor_target'](T.tensor(new_obs, dtype=T.float).to(self.device)).cpu().numpy()
-                    critic_input_ = T.from_numpy(np.concatenate((new_obs, new_action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
-                    value_dist = self.network_dict['critic_target'](critic_input)
-                    value_dist_ = self.network_dict['critic_target'](critic_input_)
-                    value_dist_target = project_value_distribution(value_dist_, reward, 1 - int(done), self.num_atoms, self.value_max, self.value_min, self.delta_z, self.gamma)
-                    value_dist_target = T.from_numpy(value_dist_target).type(T.float).to(self.device)
-                    td_error = F.binary_cross_entropy(value_dist, value_dist_target, reduction='none').sum(dim=1).cpu().numpy()
-                    priority = np.abs(td_error)
-                self._remember({
-                        'priority': priority,
-                        'transition': (obs, action, new_obs, reward, 1 - int(done))
-                    })
+                if self.store_with_given_priority:
+                    # compute td-error using local network for better initial priority
+                    # see: https://arxiv.org/pdf/1803.00933.pdf
+                    with T.no_grad():
+                        critic_input = T.from_numpy(np.concatenate((obs, action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
+                        new_action = self.network_dict['actor_target'](T.tensor(new_obs, dtype=T.float).to(self.device)).cpu().numpy()
+                        critic_input_ = T.from_numpy(np.concatenate((new_obs, new_action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
+                        value_dist = self.network_dict['critic_target'](critic_input)
+                        value_dist_ = self.network_dict['critic_target'](critic_input_)
+                        value_dist_target = project_value_distribution(value_dist_, reward, 1 - int(done), self.num_atoms, self.value_max, self.value_min, self.delta_z, self.gamma)
+                        value_dist_target = T.from_numpy(value_dist_target).type(T.float).to(self.device)
+                        td_error = F.binary_cross_entropy(value_dist, value_dist_target, reduction='none').sum(dim=1).cpu().numpy()
+                        priority = np.abs(td_error)
+                    self._remember({
+                            'priority': priority,
+                            'transition': (obs, action, new_obs, reward, 1 - int(done))
+                        })
+                else:
+                    self._remember((obs, action, new_obs, reward, 1 - int(done)))
                 if self.observation_normalization:
                     # currently observation normalization is off
                     self.normalizer.store_history(new_obs)

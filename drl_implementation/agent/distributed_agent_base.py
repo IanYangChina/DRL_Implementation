@@ -271,6 +271,7 @@ class CentralProcessor(object):
         # setup replay buffer
         # prioritised replay
         self.prioritised = algo_params['prioritised']
+        self.store_with_given_priority = algo_params['store_with_given_priority']
         # non-goal-conditioned replay buffer
         tr = transition_tuple
         if transition_tuple is None:
@@ -306,7 +307,10 @@ class CentralProcessor(object):
                 for n in range(num_transitions_in_queue):
                     data = self.queues['replay_queue'].get()
                     if self.prioritised:
-                        self.buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
+                        if self.store_with_given_priority:
+                            self.buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
+                        else:
+                            self.buffer.store_experience(*data)
                     else:
                         self.buffer.store_experience(*data)
                 if self.batch_size > len(self.buffer):
