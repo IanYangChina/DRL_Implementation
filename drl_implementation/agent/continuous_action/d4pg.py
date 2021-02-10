@@ -170,7 +170,9 @@ class D4PGLearner(Learner):
         self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate,
                                      weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
-        self._upload_learner_networks(keys=['actor_target', 'critic_target'])
+        # make sure every worker is initialised with the learner
+        for _ in range(algo_params['num_workers']):
+            self._upload_learner_networks(keys=['actor_target', 'critic_target'])
 
     def run(self):
         print('Learner on')
@@ -265,8 +267,7 @@ def project_value_distribution(value_dist, rewards, done, n_atoms, value_max, va
     projected_dist = np.zeros((batch_size, n_atoms), dtype=np.float32)
 
     for atom in range(n_atoms):
-        tz_j = np.minimum(value_max, np.maximum(value_min, copy_rewards + (
-                    value_min + atom * delta_z) * gamma))
+        tz_j = np.clip(copy_rewards + (value_min + atom * delta_z) * gamma, a_max=value_max, a_min=value_min)
         # compute where the next value is on the indexes axis of the support set
         b_j = (tz_j - value_min) / delta_z
         # compute floor and ceiling indexes of the next value on the support set
