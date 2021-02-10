@@ -215,6 +215,7 @@ class Learner(Agent):
         raise NotImplementedError()
 
     def _upload_learner_networks(self, keys):
+        print("Learner uploading network")
         params = dict.fromkeys(keys)
         for key in keys:
             params[key] = [p.data.cpu().detach().numpy() for p in self.network_dict[key].parameters()]
@@ -227,7 +228,6 @@ class Learner(Agent):
                 break
         for _ in range(self.num_workers):
             try:
-                print("Learner uploading network")
                 self.queues['network_queue'].put(params)
             except queue.Full:
                 pass

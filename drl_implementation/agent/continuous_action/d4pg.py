@@ -58,7 +58,9 @@ class D4PGWorker(Worker):
             synced = self._download_actor_networks(keys=['actor_target', 'critic_target'])
 
         # behavioural policy (exploration)
-        self.exploration_strategy = GaussianNoise(self.action_dim, scale=0.3, sigma=1.0)
+        self.exploration_strategy = GaussianNoise(self.action_dim,
+                                                  scale=algo_params['gaussian_scale'],
+                                                  sigma=algo_params['gaussian_sigma'])
 
         # statistic dict
         self.statistic_dict.update({
