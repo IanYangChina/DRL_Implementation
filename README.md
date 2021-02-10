@@ -26,7 +26,7 @@ From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
 
 ##### Algorithms: Distributed
-- [ ] D4PG - Deterministic, Continuous
+- [X] D4PG - Deterministic, Continuous
 - [ ] R2D2 - Deterministic, Discrete
 
 ##### Algorithms: Hierarchical

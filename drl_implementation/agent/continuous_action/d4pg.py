@@ -1,3 +1,4 @@
+import os
 import time
 import queue
 import importlib
@@ -44,13 +45,15 @@ class D4PG(object):
     def run(self):
         def worker_process(i, seed):
             env = self.env_source.make(self.env_name)
-            worker = D4PGBase(self.algo_params, env, 'worker', self.queues, path=self.path, seed=seed, i=i)
+            path = os.path.join(self.path, "worker_%i" % i)
+            worker = D4PGBase(self.algo_params, env, 'worker', self.queues, path=path, seed=seed, i=i)
             worker.run()
             self.empty_queue('replay_queue')
 
         def learner_process():
             env = self.env_source.make(self.env_name)
-            learner = D4PGBase(self.algo_params, env, 'learner', self.queues, path=self.path, seed=0)
+            path = os.path.join(self.path, "learner")
+            learner = D4PGBase(self.algo_params, env, 'learner', self.queues, path=path, seed=0)
             learner.run()
             self.empty_queue('priority_queue')
             self.empty_queue('network_queue')
