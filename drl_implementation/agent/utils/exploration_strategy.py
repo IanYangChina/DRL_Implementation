@@ -138,14 +138,15 @@ class OUNoise(object):
 
 
 class GaussianNoise(object):
-    def __init__(self, action_dim, mu=0, sigma=0.1, rng=None):
+    def __init__(self, action_dim, scale=1, mu=0, sigma=0.1, rng=None):
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:
             self.rng = rng
+        self.scale = scale
         self.action_dim = action_dim
         self.mu = np.ones(self.action_dim)*mu
         self.sigma = self.mu = np.ones(self.action_dim)*sigma
 
     def __call__(self):
-        return self.rng.normal(loc=self.mu, scale=self.sigma)
+        return self.scale*self.rng.normal(loc=self.mu, scale=self.sigma)

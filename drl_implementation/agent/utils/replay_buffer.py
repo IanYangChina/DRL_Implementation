@@ -198,6 +198,14 @@ class PrioritisedReplayBuffer(object):
         self.min_tree[self.mem_position] = self._max_priority ** self.alpha
         self.mem_position = (self.mem_position + 1) % self.capacity
 
+    def store_experience_with_given_priority(self, priority, *args):
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.mem_position] = self.Transition(*args)
+        self.sum_tree[self.mem_position] = (priority + self.epsilon) ** self.alpha
+        self.min_tree[self.mem_position] = (priority + self.epsilon) ** self.alpha
+        self.mem_position = (self.mem_position + 1) % self.capacity
+
     def sample(self, batch_size, beta=None):
         if beta is None:
             beta = self.beta
@@ -223,11 +231,6 @@ class PrioritisedReplayBuffer(object):
         for i in range(batch_size):
             mass = self.rng.uniform() * interval + i * interval
             ind = self.sum_tree.find_prefixsum_idx(mass)
-            try:
-                k = self.memory[ind]
-            except IndexError as e:
-                print(e, ind, len(self))
-
             inds.append(ind)
         return inds, priority_sum
 
@@ -259,7 +262,6 @@ class PrioritisedReplayBuffer(object):
         actions = np.load(self.saving_path+'/actions.npy')
         next_observations = np.load(self.saving_path+'/next_observations.npy')
         reward = np.load(self.saving_path+'/reward.npy')
-        print(reward.sum())
         done = np.load(self.saving_path+'/done.npy')
 
         for i in range(observations.shape[0]):
@@ -349,11 +351,6 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
         for i in range(batch_size):
             mass = self.rng.uniform() * interval + i * interval
             ind = self.sum_tree.find_prefixsum_idx(mass)
-            try:
-                k = self.memory[ind]
-            except IndexError as e:
-                print(e, ind, len(self))
-
             inds.append(ind)
         return inds, priority_sum
 
