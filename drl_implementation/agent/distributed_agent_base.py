@@ -220,18 +220,16 @@ class Learner(Agent):
         params = dict.fromkeys(keys)
         for key in keys:
             params[key] = [p.data.cpu().detach().numpy() for p in self.network_dict[key].parameters()]
-        # empty the queue
-        while True:
-            try:
-                data = self.queues['network_queue'].get_nowait()
-                del data
-            except queue.Empty:
-                break
-        for _ in range(self.num_workers):
-            try:
-                self.queues['network_queue'].put(params)
-            except queue.Full:
-                pass
+        # delete an old net and upload a new one
+        try:
+            data = self.queues['network_queue'].get_nowait()
+            del data
+        except queue.Empty:
+            pass
+        try:
+            self.queues['network_queue'].put(params)
+        except queue.Full:
+            pass
 
 
 class CentralProcessor(object):
