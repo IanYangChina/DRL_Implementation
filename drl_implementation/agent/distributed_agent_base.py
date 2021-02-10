@@ -10,6 +10,7 @@ from collections import namedtuple
 from .utils.plot import smoothed_plot
 from .utils.replay_buffer import *
 from .utils.normalizer import Normalizer
+
 t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
 
 
@@ -93,12 +94,12 @@ class Agent(object):
         if ep is None:
             ep = ''
         else:
-            ep = '_ep'+str(ep)
+            ep = '_ep' + str(ep)
         if keys is None:
             keys = self.network_keys_to_save
         assert keys is not None
         for key in keys:
-            T.save(self.network_dict[key].state_dict(), self.ckpt_path+'/ckpt_'+key+ep+'.pt')
+            T.save(self.network_dict[key].state_dict(), self.ckpt_path + '/ckpt_' + key + ep + '.pt')
 
     def _load_network(self, keys=None, ep=None):
         if not self.image_obs:
@@ -107,19 +108,19 @@ class Agent(object):
         if ep is None:
             ep = ''
         else:
-            ep = '_ep'+str(ep)
+            ep = '_ep' + str(ep)
         if keys is None:
             keys = self.network_keys_to_save
         assert keys is not None
         for key in keys:
-            self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+'.pt'))
+            self.network_dict[key].load_state_dict(T.load(self.ckpt_path + '/ckpt_' + key + ep + '.pt'))
 
     def _save_statistics(self):
         if not self.image_obs:
             np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
             np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
         json.dump(self.statistic_dict, open(os.path.join(self.data_path, 'statistics.json'), 'w'))
-    
+
     def _plot_statistics(self, keys=None, x_labels=None, y_labels=None, window=5):
         if y_labels is None:
             y_labels = {}
@@ -134,7 +135,7 @@ class Agent(object):
                 else:
                     label = key
                 y_labels.update({key: label})
-        
+
         if x_labels is None:
             x_labels = {}
         for key in list(self.statistic_dict.keys()):
@@ -148,14 +149,14 @@ class Agent(object):
                 else:
                     label = 'Episode'
                 x_labels.update({key: label})
-        
+
         if keys is None:
             for key in list(self.statistic_dict.keys()):
-                smoothed_plot(os.path.join(self.path, key+'.png'), self.statistic_dict[key],
+                smoothed_plot(os.path.join(self.path, key + '.png'), self.statistic_dict[key],
                               x_label=x_labels[key], y_label=y_labels[key], window=window)
         else:
             for key in keys:
-                smoothed_plot(os.path.join(self.path, key+'.png'), self.statistic_dict[key],
+                smoothed_plot(os.path.join(self.path, key + '.png'), self.statistic_dict[key],
                               x_label=x_labels[key], y_label=y_labels[key], window=window)
 
 
@@ -234,7 +235,8 @@ class Learner(Agent):
 
 
 class CentralProcessor(object):
-    def __init__(self, algo_params, env_name, env_source, learner, worker, transition_tuple=None, path=None, worker_seeds=None, seed=0):
+    def __init__(self, algo_params, env_name, env_source, learner, worker, transition_tuple=None, path=None,
+                 worker_seeds=None, seed=0):
         self.algo_params = algo_params.copy()
         self.env_name = env_name
         assert env_source in ['gym', 'pybullet_envs', 'pybullet_multigoal_gym'], \
@@ -303,16 +305,16 @@ class CentralProcessor(object):
 
         def update_buffer():
             while self.queues['learner_step_count'].value < self.learner_steps:
-                # num_transitions_in_queue = self.queues['replay_queue'].qsize()
-                data = self.queues['replay_queue'].get()
-                if self.prioritised:
-                    if self.store_with_given_priority:
-                        self.buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
+                num_transitions_in_queue = self.queues['replay_queue'].qsize()
+                for n in range(num_transitions_in_queue):
+                    data = self.queues['replay_queue'].get()
+                    if self.prioritised:
+                        if self.store_with_given_priority:
+                            self.buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
+                        else:
+                            self.buffer.store_experience(*data)
                     else:
                         self.buffer.store_experience(*data)
-                else:
-                    self.buffer.store_experience(*data)
-
                 if self.batch_size > len(self.buffer):
                     continue
 
