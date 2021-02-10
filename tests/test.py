@@ -1,6 +1,5 @@
 import os
 import drl_implementation
-import pybullet_envs
 
 algo_params = {
     'prioritised': True,
@@ -22,8 +21,8 @@ algo_params = {
 
     'num_workers': 4,
     'learner_steps': int(1e6),
-    'learner_upload_gap': int(4e3),
-    'worker_update_gap': int(5e3),
+    'learner_upload_gap': int(1e3),
+    'worker_update_gap': 3,
     'replay_queue_size': 64,
     'priority_queue_size': 64,
     'batch_queue_size': 10,

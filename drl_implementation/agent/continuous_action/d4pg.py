@@ -9,24 +9,24 @@ from torch.optim.adam import Adam
 from ..utils.networks import Actor, Critic
 from ..utils.replay_buffer import PrioritisedReplayBuffer
 from ..agent_base import Agent, t
-from ..utils.exploration_strategy import OUNoise, GaussianNoise
+from ..utils.exploration_strategy import GaussianNoise
 
 
 class D4PG(object):
     def __init__(self, algo_params, env_name, env_source, path=None, seeds=None):
         self.env_name = env_name
-        self.env_source = env_source
-        assert self.env_source in ['gym', 'pybullet_envs', 'pybullet_multigoal_gym'], \
+        assert env_source in ['gym', 'pybullet_envs', 'pybullet_multigoal_gym'], \
             "unsupported env source: {}, " \
             "only 3 env sources are supported: {}, " \
-            "for new env sources please modify the original code".format(self.env_source,
+            "for new env sources please modify the original code".format(env_source,
                                                                          ['gym', 'pybullet_envs', 'pybullet_multigoal_gym'])
+        self.env_source = importlib.import_module(env_source)
         self.algo_params = algo_params
         self.batch_size = algo_params['batch_size']
         self.num_workers = algo_params['num_workers']
         self.learner_steps = algo_params['learner_steps']
         if seeds is None:
-            seeds = np.random.randint(10, 1000, size=self.num_workers)
+            seeds = np.random.randint(10, 1000, size=self.num_workers).tolist()
         else:
             assert len(seeds) == self.num_workers, 'should assign seeds to every worker'
         self.path = path
@@ -43,15 +43,13 @@ class D4PG(object):
 
     def run(self):
         def worker_process(i, seed):
-            env_source = importlib.import_module(self.env_source)
-            env = env_source.make(self.env_name)
+            env = self.env_source.make(self.env_name)
             worker = D4PGBase(self.algo_params, env, 'worker', self.queues, path=self.path, seed=seed, i=i)
             worker.run()
             self.empty_queue('replay_queue')
 
         def learner_process():
-            env_source = importlib.import_module(self.env_source)
-            env = env_source.make(self.env_name)
+            env = self.env_source.make(self.env_name)
             learner = D4PGBase(self.algo_params, env, 'learner', self.queues, path=self.path, seed=0)
             learner.run()
             self.empty_queue('priority_queue')
@@ -71,18 +69,23 @@ class D4PG(object):
                     self.central_buffer.update_priority(inds, priorities)
                 except queue.Empty:
                     pass
-
-                batch, weights, inds = self.central_buffer.sample(batch_size=self.batch_size)
-                self.queues['batch_queue'].put_nowait((batch, weights, inds))
+                try:
+                    batch, weights, inds = self.central_buffer.sample(batch_size=self.batch_size)
+                    state, action, next_state, reward, done = batch
+                    self.queues['batch_queue'].put_nowait((state, action, next_state, reward, done, weights, inds))
+                except queue.Full:
+                    time.sleep(0.1)
+                    continue
             self.empty_queue('batch_queue')
 
         processes = []
         p = T.multiprocessing.Process(target=update_central_buffer)
         processes.append(p)
-        p = T.multiprocessing.Process(target=learner_process())
+        p = T.multiprocessing.Process(target=learner_process)
         processes.append(p)
         for i in range(self.num_workers):
-            p = T.multiprocessing.Process(target=worker_process(i=i, seed=self.seeds[i]))
+            p = T.multiprocessing.Process(target=worker_process,
+                                          args=(i, self.seeds[i]))
             processes.append(p)
 
         for p in processes:
@@ -139,6 +142,7 @@ class D4PGBase(Agent):
         self.support = T.linspace(self.value_min, self.value_max, steps=self.num_atoms).to(self.device)
         # network
         if self.agent_type == 'learner':
+            self.env.close()
             self.network_dict.update({
                 'actor': Actor(self.state_dim, self.action_dim).to(self.device),
                 'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
@@ -195,7 +199,7 @@ class D4PGBase(Agent):
                 self.queues['num_global_episode'].value += 1
                 ep_return = self._interact(render, test, sleep=sleep)
                 self.statistic_dict['episode_return'].append(ep_return)
-                print("'Worker No. " % self.worker_id, "Episode %i" % ep, "return %0.1f" % ep_return)
+                print("'Worker No. %i" % self.worker_id, "Episode %i" % ep, "return %0.1f" % ep_return)
                 if (ep % self.saving_gap == 0) and (ep != 0):
                     self._save_network(ep=ep)
                 if (ep % self.worker_update_gap == 0) and (ep != 0):
@@ -245,15 +249,22 @@ class D4PGBase(Agent):
                 # compute td error using local network for better initial priority
                 # see: https://arxiv.org/pdf/1803.00933.pdf
                 with T.no_grad():
-                    critic_input = T.from_numpy(np.concatenate((obs, action)))
-                    critic_input_ = T.from_numpy(np.concatenate((new_obs, self.network_dict['actor'](new_obs).cpu().numpy().item())))
-                    value = self.network_dict['critic_target'](critic_input)
-                    value_target = self.gamma * self.network_dict['critic_target'](critic_input_) + reward
-                    priority = np.abs(value - value_target)
-                self.queues['replay_queue'].put_nowait({
-                    'priority': priority,
-                    'transition': (obs, action, new_obs, reward, 1 - int(done))
-                })
+                    critic_input = T.from_numpy(np.concatenate((obs, action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
+                    new_action = self.network_dict['actor_target'](T.tensor(new_obs, dtype=T.float).to(self.device)).cpu().numpy()
+                    critic_input_ = T.from_numpy(np.concatenate((new_obs, new_action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
+                    value_dist = self.network_dict['critic_target'](critic_input)
+                    value_dist_ = self.network_dict['critic_target'](critic_input_)
+                    value_dist_target = self.project_value_distribution(value_dist_, reward, 1 - int(done))
+                    value_dist_target = T.from_numpy(value_dist_target).type(T.float).to(self.device)
+                    td_error = F.binary_cross_entropy(value_dist, value_dist_target, reduction='none').sum(dim=1).cpu().numpy()
+                    priority = np.abs(td_error)
+                try:
+                    self.queues['replay_queue'].put_nowait({
+                        'priority': priority,
+                        'transition': (obs, action, new_obs, reward, 1 - int(done))
+                    })
+                except queue.Full:
+                    continue
                 if self.observation_normalization:
                     # todo: observation in distributed training should be synced as well
                     # currently observation normalization is off
@@ -281,19 +292,24 @@ class D4PGBase(Agent):
             source = self.queues['network_queue'].get_nowait()
         except:
             return False
+        print("Worker No. %i downloading network" % self.worker_id)
         for target_param, param in zip(self.network_dict['actor_target'].parameters(), source['actor']):
-            w = torch.tensor(param).float()
+            w = T.tensor(param).float()
             target_param.data.copy_(w)
         for target_param, param in zip(self.network_dict['critic_target'].parameters(), source['critic']):
-            w = torch.tensor(param).float()
+            w = T.tensor(param).float()
             target_param.data.copy_(w)
         return True
 
     def upload_learner_networks(self):
-        self.queues['network_queue'].put({
-            'actor': [p.data.cpu().detach().numpy() for p in self.network_dict['actor_target'].parameters()],
-            'critic': [p.data.cpu().detach().numpy() for p in self.network_dict['critic_target'].parameters()]
-        })
+        try:
+            print("Learner uploading network")
+            self.queues['network_queue'].put({
+                'actor': [p.data.cpu().detach().numpy() for p in self.network_dict['actor_target'].parameters()],
+                'critic': [p.data.cpu().detach().numpy() for p in self.network_dict['critic_target'].parameters()]
+            })
+        except queue.Full:
+            pass
 
     def _learn(self, steps=None, batch=None):
         if batch is None:
@@ -302,17 +318,18 @@ class D4PGBase(Agent):
             steps = self.optimizer_steps
 
         for i in range(steps):
-            batch, weights, inds = batch
+            # batch, weights, inds = batch
+            state, action, next_state, reward, done, weights, inds = batch
             weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
 
-            actor_inputs = self.normalizer(batch.state)
+            actor_inputs = self.normalizer(state)
             actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
-            actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
+            actions = T.tensor(action, dtype=T.float32).to(self.device)
             critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
-            actor_inputs_ = self.normalizer(batch.next_state)
+            actor_inputs_ = self.normalizer(next_state)
             actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
-            rewards = T.tensor(batch.reward, dtype=T.float32).to(self.device)
-            done = T.tensor(batch.done, dtype=T.float32).to(self.device)
+            rewards = T.tensor(reward, dtype=T.float32).to(self.device)
+            done = T.tensor(done, dtype=T.float32).to(self.device)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
@@ -353,9 +370,13 @@ class D4PGBase(Agent):
         # refer to https://github.com/schatty/d4pg-pytorch/blob/7dc23096a45bc4036fbb02493e0b052d57cfe4c6/models/d4pg/l2_projection.py#L7
         # comments added
         copy_value_dist = value_dist.data.cpu().numpy()
-        copy_rewards = rewards.data.cpu().numpy()
-        copy_done = (1 - done).data.cpu().numpy().astype(np.bool)
-        batch_size = self.batch_size
+        if isinstance(rewards, T.Tensor):
+            copy_rewards = rewards.data.cpu().numpy()
+            copy_done = (1 - done).data.cpu().numpy().astype(np.bool)
+        else:
+            copy_rewards = np.array(rewards).reshape(-1)
+            copy_done = np.array((1 - done)).reshape(-1).astype(np.bool)
+        batch_size = copy_value_dist.shape[0]
         n_atoms = self.num_atoms
         projected_dist = np.zeros((batch_size, n_atoms), dtype=np.float32)
 
