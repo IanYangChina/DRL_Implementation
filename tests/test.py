@@ -19,7 +19,7 @@ algo_params = {
     'value_max': 50,
     'value_min': -50,
 
-    'num_workers': 4,
+    'num_workers': 1,
     'learner_steps': int(1e6),
     'learner_upload_gap': int(1e3),
     'worker_update_gap': 3,

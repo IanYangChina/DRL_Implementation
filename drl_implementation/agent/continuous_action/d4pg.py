@@ -10,104 +10,24 @@ from torch.optim.adam import Adam
 from ..utils.networks import Actor, Critic
 from ..utils.replay_buffer import PrioritisedReplayBuffer
 from ..agent_base import Agent, t
+from ..distributed_agent_base import CentralProcessor, Worker, Learner
 from ..utils.exploration_strategy import GaussianNoise
 
 
-class D4PG(object):
-    def __init__(self, algo_params, env_name, env_source, path=None, seeds=None):
-        self.env_name = env_name
-        assert env_source in ['gym', 'pybullet_envs', 'pybullet_multigoal_gym'], \
-            "unsupported env source: {}, " \
-            "only 3 env sources are supported: {}, " \
-            "for new env sources please modify the original code".format(env_source,
-                                                                         ['gym', 'pybullet_envs', 'pybullet_multigoal_gym'])
-        self.env_source = importlib.import_module(env_source)
-        self.algo_params = algo_params
-        self.batch_size = algo_params['batch_size']
-        self.num_workers = algo_params['num_workers']
-        self.learner_steps = algo_params['learner_steps']
-        if seeds is None:
-            seeds = np.random.randint(10, 1000, size=self.num_workers).tolist()
-        else:
-            assert len(seeds) == self.num_workers, 'should assign seeds to every worker'
-        self.path = path
-        self.seeds = seeds
-        self.central_buffer = PrioritisedReplayBuffer(algo_params['memory_capacity'], t, rng=np.random.default_rng(seed=0))
-        self.queues = {
-            'replay_queue': mp.Queue(maxsize=algo_params['replay_queue_size']),
-            'priority_queue': mp.Queue(maxsize=algo_params['priority_queue_size']),
-            'batch_queue': mp.Queue(maxsize=algo_params['batch_queue_size']),
-            'network_queue': T.multiprocessing.Queue(maxsize=self.num_workers),
-            'learner_steps': mp.Value('i', 0),
-            'num_global_episode': mp.Value('i', 0),
-        }
-
-    def run(self):
-        def worker_process(i, seed):
-            env = self.env_source.make(self.env_name)
-            path = os.path.join(self.path, "worker_%i" % i)
-            worker = D4PGBase(self.algo_params, env, 'worker', self.queues, path=path, seed=seed, i=i)
-            worker.run()
-            self.empty_queue('replay_queue')
-
-        def learner_process():
-            env = self.env_source.make(self.env_name)
-            path = os.path.join(self.path, "learner")
-            learner = D4PGBase(self.algo_params, env, 'learner', self.queues, path=path, seed=0)
-            learner.run()
-            self.empty_queue('priority_queue')
-            self.empty_queue('network_queue')
-
-        def update_central_buffer():
-            while self.queues['learner_steps'].value < self.learner_steps:
-                num_transitions_in_queue = self.queues['replay_queue'].qsize()
-                for n in range(num_transitions_in_queue):
-                    data = self.queues['replay_queue'].get()
-                    self.central_buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
-                if self.batch_size > len(self.central_buffer):
-                    continue
-
-                try:
-                    inds, priorities = self.queues['priority_queue'].get_nowait()
-                    self.central_buffer.update_priority(inds, priorities)
-                except queue.Empty:
-                    pass
-                try:
-                    batch, weights, inds = self.central_buffer.sample(batch_size=self.batch_size)
-                    state, action, next_state, reward, done = batch
-                    self.queues['batch_queue'].put_nowait((state, action, next_state, reward, done, weights, inds))
-                except queue.Full:
-                    time.sleep(0.1)
-                    continue
-            self.empty_queue('batch_queue')
-
-        processes = []
-        p = T.multiprocessing.Process(target=update_central_buffer)
-        processes.append(p)
-        p = T.multiprocessing.Process(target=learner_process)
-        processes.append(p)
-        for i in range(self.num_workers):
-            p = T.multiprocessing.Process(target=worker_process,
-                                          args=(i, self.seeds[i]))
-            processes.append(p)
-
-        for p in processes:
-            p.start()
-        for p in processes:
-            p.join()
-
-    def empty_queue(self, queue_name):
-        while True:
-            try:
-                data = self.queues[queue_name].get_nowait()
-                del data
-            except:
-                break
-        self.queues[queue_name].close()
+class D4PG(CentralProcessor):
+    def __init__(self, algo_params, env_name, env_source, path=None, worker_seeds=None, seed=0):
+        super(D4PG, self).__init__(algo_params=algo_params,
+                                   env_name=env_name,
+                                   env_source=env_source,
+                                   learner=D4PGLearner,
+                                   worker=D4PGWorker,
+                                   path=path,
+                                   worker_seeds=worker_seeds,
+                                   seed=seed)
 
 
-class D4PGBase(Agent):
-    def __init__(self, algo_params, env, agent_type, queues, transition_tuple=None, path=None, seed=-1, i=-1):
+class D4PGWorker(Worker):
+    def __init__(self, algo_params, env, queues, path=None, seed=0, i=0):
         # environment
         self.env = env
         self.env.seed(seed)
@@ -119,123 +39,55 @@ class D4PGBase(Agent):
                             'init_input_means': None,
                             'init_input_vars': None
                             })
+
         # training args
         self.training_episodes = algo_params['training_episodes']
-        self.testing_gap = algo_params['testing_gap']
-        self.testing_episodes = algo_params['testing_episodes']
         self.saving_gap = algo_params['saving_gap']
-        self.learner_steps = algo_params['learner_steps']
-        self.learner_upload_gap = algo_params['learner_upload_gap']  # in optimization steps
-        self.worker_update_gap = algo_params['worker_update_gap']  # in episodes
+        super(D4PGWorker, self).__init__(algo_params, queues, path=path, seed=seed, i=i)
 
-        super(D4PGBase, self).__init__(algo_params,
-                                       transition_tuple=transition_tuple,
-                                       goal_conditioned=False,
-                                       path=path,
-                                       seed=seed)
-        self.agent_type = agent_type
-        assert self.agent_type in ['worker', 'learner', 'evaluation']
-        self.queues = queues
-        # torch
-        # categorical distribution atoms
+        # networks
         self.num_atoms = algo_params['num_atoms']
         self.value_max = algo_params['value_max']
         self.value_min = algo_params['value_min']
         self.delta_z = (self.value_max - self.value_min) / (self.num_atoms - 1)
-        self.support = T.linspace(self.value_min, self.value_max, steps=self.num_atoms).to(self.device)
-        # network
-        if self.agent_type == 'learner':
-            self.env.close()
-            self.network_dict.update({
-                'actor': Actor(self.state_dim, self.action_dim).to(self.device),
-                'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
-                'critic': Critic(self.state_dim + self.action_dim, self.num_atoms, softmax=True).to(self.device),
-                'critic_target': Critic(self.state_dim + self.action_dim, self.num_atoms, softmax=True).to(self.device)
-            })
-            self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
-            self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
-            self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate,
-                                         weight_decay=algo_params['Q_weight_decay'])
-            self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
-            self.upload_learner_networks()
-        else:
-            self.worker_id = i
-            self.network_dict.update({
-                'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
-                'critic_target': Critic(self.state_dim + self.action_dim, self.num_atoms, softmax=True).to(self.device)
-            })
-            # make sure the worker networks are synced with the initial learner
-            synced = False
-            while not synced:
-                synced = self.sync_actor_networks()
-            # behavioural policy args (exploration)
-            self.exploration_strategy = GaussianNoise(self.action_dim, scale=0.3, sigma=1.0)
-            # training args
-            self.warmup_step = algo_params['warmup_step']
+        self.network_dict.update({
+            'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
+            'critic_target': Critic(self.state_dim + self.action_dim, self.num_atoms, softmax=True).to(self.device)
+        })
         self.network_keys_to_save = ['actor_target', 'critic_target']
+
+        # make sure the worker networks are synced with the initial learner
+        synced = False
+        while not synced:
+            synced = self._download_actor_networks(keys=['actor_target', 'critic_target'])
+
+        # behavioural policy (exploration)
+        self.exploration_strategy = GaussianNoise(self.action_dim, scale=0.3, sigma=1.0)
+
         # statistic dict
         self.statistic_dict.update({
             'episode_return': [],
             'step_test_return': []
         })
 
-    def run(self, test=False, render=False, load_network_ep=None, sleep=0):
-        if self.agent_type == 'learner':
-            print('Learner on')
-            while self.queues['learner_steps'].value < self.learner_steps:
-                try:
-                    batch = self.queues['batch_queue'].get_nowait()
-                except queue.Empty:
-                    continue
-                self._learn(batch=batch)
-                if self.queues['learner_steps'].value % self.learner_upload_gap == 0:
-                    self.upload_learner_networks()
-            print("Saving learner statistics...")
-            self._save_statistics()
-            self._plot_statistics(keys=['actor_loss', 'critic_loss'])
-            print('Learner shutdown')
-
-        elif self.agent_type == 'worker':
-            print('Worker No. {} on'.format(self.worker_id))
-            num_episode = self.training_episodes
-            for ep in range(num_episode):
-                self.queues['num_global_episode'].value += 1
-                ep_return = self._interact(render, test, sleep=sleep)
-                self.statistic_dict['episode_return'].append(ep_return)
-                print("'Worker No. %i" % self.worker_id, "Episode %i" % ep, "return %0.1f" % ep_return)
-                if (ep % self.saving_gap == 0) and (ep != 0):
-                    self._save_network(ep=ep)
-                if (ep % self.worker_update_gap == 0) and (ep != 0):
-                    synced = False
-                    while not synced:
-                        synced = self.sync_actor_networks()
-            print("Saving Worker No. {} statistics...".format(self.worker_id))
-            self._save_statistics()
-            self._plot_statistics(keys=['episode_return'])
-            print('Worker No. {} shutdown'.format(self.worker_id))
-
-        else:
-            print('Evaluation on')
-            num_episode = self.testing_episodes
-            current_learner_step = self.queues['learner_steps'].value
-            while current_learner_step < self.learner_steps:
-                if current_learner_step % self.testing_gap == 0:
-                    synced = False
-                    while not synced:
-                        synced = self.sync_actor_networks()
-
-                    ep_test_return = []
-                    for test_ep in range(num_episode):
-                        ep_test_return.append(self._interact(render, test=True))
-                    self.statistic_dict['step_test_return'].append(sum(ep_test_return) / self.testing_episodes)
-                    print("Learner step %i" % current_learner_step,
-                          "test return %0.1f" % (sum(ep_test_return) / self.testing_episodes))
-                current_learner_step = self.queues['learner_steps'].value
-
-            print("Saving evaluation statistics...")
-            self._save_statistics()
-            self._plot_statistics(keys=['step_test_return'])
-            print('Evaluation shutdown')
+    def run(self, render=False, test=False, load_network_ep=None, sleep=0):
+        print('Worker No. {} on'.format(self.worker_id))
+        num_episode = self.training_episodes
+        for ep in range(num_episode):
+            self.queues['num_global_episode'].value += 1
+            ep_return = self._interact(render, test, sleep=sleep)
+            self.statistic_dict['episode_return'].append(ep_return)
+            print("'Worker No. %i" % self.worker_id, "Episode %i" % ep, "return %0.1f" % ep_return)
+            if (ep % self.saving_gap == 0) and (ep != 0):
+                self._save_network(ep=ep)
+            if (ep % self.worker_update_gap == 0) and (ep != 0):
+                synced = False
+                while not synced:
+                    synced = self._download_actor_networks(keys=self.network_keys_to_save)
+        print("Saving Worker No. {} statistics...".format(self.worker_id))
+        self._save_statistics()
+        self._plot_statistics(keys=['episode_return'])
+        print('Worker No. {} shutdown'.format(self.worker_id))
 
     def _interact(self, render=False, test=False, sleep=0):
         done = False
@@ -249,7 +101,7 @@ class D4PGBase(Agent):
             time.sleep(sleep)
             ep_return += reward
             if not test:
-                # compute td error using local network for better initial priority
+                # compute td-error using local network for better initial priority
                 # see: https://arxiv.org/pdf/1803.00933.pdf
                 with T.no_grad():
                     critic_input = T.from_numpy(np.concatenate((obs, action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
@@ -257,19 +109,15 @@ class D4PGBase(Agent):
                     critic_input_ = T.from_numpy(np.concatenate((new_obs, new_action), axis=0)).type(T.float).unsqueeze(0).to(self.device)
                     value_dist = self.network_dict['critic_target'](critic_input)
                     value_dist_ = self.network_dict['critic_target'](critic_input_)
-                    value_dist_target = self.project_value_distribution(value_dist_, reward, 1 - int(done))
+                    value_dist_target = project_value_distribution(value_dist_, reward, 1 - int(done), self.num_atoms, self.value_max, self.value_min, self.delta_z, self.gamma)
                     value_dist_target = T.from_numpy(value_dist_target).type(T.float).to(self.device)
                     td_error = F.binary_cross_entropy(value_dist, value_dist_target, reduction='none').sum(dim=1).cpu().numpy()
                     priority = np.abs(td_error)
-                try:
-                    self.queues['replay_queue'].put_nowait({
+                self._remember({
                         'priority': priority,
                         'transition': (obs, action, new_obs, reward, 1 - int(done))
                     })
-                except queue.Full:
-                    continue
                 if self.observation_normalization:
-                    # todo: observation in distributed training should be synced as well
                     # currently observation normalization is off
                     self.normalizer.store_history(new_obs)
                     self.normalizer.update_mean()
@@ -290,29 +138,57 @@ class D4PGBase(Agent):
             noise = self.exploration_strategy()
             return np.clip(action + noise, -self.action_max, self.action_max)
 
-    def sync_actor_networks(self):
-        try:
-            source = self.queues['network_queue'].get_nowait()
-        except:
-            return False
-        print("Worker No. %i downloading network" % self.worker_id)
-        for target_param, param in zip(self.network_dict['actor_target'].parameters(), source['actor']):
-            w = T.tensor(param).float()
-            target_param.data.copy_(w)
-        for target_param, param in zip(self.network_dict['critic_target'].parameters(), source['critic']):
-            w = T.tensor(param).float()
-            target_param.data.copy_(w)
-        return True
 
-    def upload_learner_networks(self):
-        try:
-            print("Learner uploading network")
-            self.queues['network_queue'].put({
-                'actor': [p.data.cpu().detach().numpy() for p in self.network_dict['actor_target'].parameters()],
-                'critic': [p.data.cpu().detach().numpy() for p in self.network_dict['critic_target'].parameters()]
-            })
-        except queue.Full:
-            pass
+class D4PGLearner(Learner):
+    def __init__(self, algo_params, queues, path=None, seed=0):
+        # environment
+        self.env = env
+        self.env.seed(seed)
+        obs = self.env.reset()
+        algo_params.update({'state_dim': obs.shape[0],
+                            'action_dim': self.env.action_space.shape[0],
+                            'action_max': self.env.action_space.high,
+                            'action_scaling': self.env.action_space.high[0],
+                            'init_input_means': None,
+                            'init_input_vars': None
+                            })
+        self.env.close()
+
+        super(D4PGLearner, self).__init__(algo_params, queues, path=path, seed=seed)
+        # categorical distribution atoms
+        self.num_atoms = algo_params['num_atoms']
+        self.value_max = algo_params['value_max']
+        self.value_min = algo_params['value_min']
+        self.delta_z = (self.value_max - self.value_min) / (self.num_atoms - 1)
+        self.support = T.linspace(self.value_min, self.value_max, steps=self.num_atoms).to(self.device)
+
+        self.network_dict.update({
+            'actor': Actor(self.state_dim, self.action_dim).to(self.device),
+            'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
+            'critic': Critic(self.state_dim + self.action_dim, self.num_atoms, softmax=True).to(self.device),
+            'critic_target': Critic(self.state_dim + self.action_dim, self.num_atoms, softmax=True).to(self.device)
+        })
+        self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
+        self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
+        self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate,
+                                     weight_decay=algo_params['Q_weight_decay'])
+        self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
+        self._upload_learner_networks(keys=['actor_target', 'critic_target'])
+
+    def run(self):
+        print('Learner on')
+        while self.queues['learner_steps'].value < self.learner_steps:
+            try:
+                batch = self.queues['batch_queue'].get_nowait()
+            except queue.Empty:
+                continue
+            self._learn(batch=batch)
+            if self.queues['learner_steps'].value % self.learner_upload_gap == 0:
+                self._upload_learner_networks(keys=['actor_target', 'critic_target'])
+        print("Saving learner statistics...")
+        self._save_statistics()
+        self._plot_statistics(keys=['actor_loss', 'critic_loss'])
+        print('Learner shutdown')
 
     def _learn(self, steps=None, batch=None):
         if batch is None:
@@ -321,9 +197,13 @@ class D4PGBase(Agent):
             steps = self.optimizer_steps
 
         for i in range(steps):
-            # batch, weights, inds = batch
-            state, action, next_state, reward, done, weights, inds = batch
-            weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
+            if self.prioritised:
+                state, action, next_state, reward, done, weights, inds = batch
+                weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
+            else:
+                state, action, next_state, reward, done = batch
+                weights = T.ones(size=(self.batch_size, 1)).to(self.device)
+                inds = None
 
             actor_inputs = self.normalizer(state)
             actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
@@ -341,7 +221,7 @@ class D4PGBase(Agent):
                 actions_ = self.network_dict['actor_target'](actor_inputs_)
                 critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
                 value_dist_ = self.network_dict['critic_target'](critic_inputs_)
-                value_dist_target = self.project_value_distribution(value_dist_, rewards, done)
+                value_dist_target = project_value_distribution(value_dist_, rewards, done, self.num_atoms, self.value_max, self.value_min, self.delta_z, self.gamma)
                 value_dist_target = T.from_numpy(value_dist_target).to(self.device)
 
             self.critic_optimizer.zero_grad()
@@ -350,7 +230,11 @@ class D4PGBase(Agent):
             (critic_loss * weights).mean().backward()
             self.critic_optimizer.step()
 
-            self.queues['priority_queue'].put((inds, np.abs(critic_loss.cpu().detach().numpy())))
+            if self.prioritised:
+                try:
+                    self.queues['priority_queue'].put((inds, np.abs(critic_loss.cpu().detach().numpy())))
+                except queue.Full:
+                    pass
 
             self.actor_optimizer.zero_grad()
             new_actions = self.network_dict['actor'](actor_inputs)
@@ -369,60 +253,60 @@ class D4PGBase(Agent):
 
             self.queues['learner_steps'].value += 1
 
-    def project_value_distribution(self, value_dist, rewards, done):
-        # refer to https://github.com/schatty/d4pg-pytorch/blob/7dc23096a45bc4036fbb02493e0b052d57cfe4c6/models/d4pg/l2_projection.py#L7
-        # comments added
-        copy_value_dist = value_dist.data.cpu().numpy()
-        if isinstance(rewards, T.Tensor):
-            copy_rewards = rewards.data.cpu().numpy()
-            copy_done = (1 - done).data.cpu().numpy().astype(np.bool)
-        else:
-            copy_rewards = np.array(rewards).reshape(-1)
-            copy_done = np.array((1 - done)).reshape(-1).astype(np.bool)
-        batch_size = copy_value_dist.shape[0]
-        n_atoms = self.num_atoms
-        projected_dist = np.zeros((batch_size, n_atoms), dtype=np.float32)
 
-        for atom in range(n_atoms):
-            tz_j = np.minimum(self.value_max, np.maximum(self.value_min, copy_rewards + (
-                        self.value_min + atom * self.delta_z) * self.gamma))
-            # compute where the next value is on the indexes axis of the support set
-            b_j = (tz_j - self.value_min) / self.delta_z
-            # compute floor and ceiling indexes of the next value on the support set
-            l = np.floor(b_j).astype(np.int64)
-            u = np.ceil(b_j).astype(np.int64)
-            # since l and u are floor and ceiling indexes of the next value on the support set, their difference is always 0 at the boundary and 1 otherwise
-            # thus, the predicted probability of the next value is distributed proportional to the difference between the projected value index (b_j) and its floor or ceiling
-            # boundary case, floor == ceiling
-            eq_mask = u == l
-            projected_dist[eq_mask, l[eq_mask]] += copy_value_dist[eq_mask, atom]
-            ne_mask = u != l
-            # otherwise, (u - b_j) + (b_j - l) == 1
-            projected_dist[ne_mask, l[ne_mask]] += copy_value_dist[ne_mask, atom] * (u - b_j)[ne_mask]
-            projected_dist[ne_mask, u[ne_mask]] += copy_value_dist[ne_mask, atom] * (b_j - l)[ne_mask]
+def project_value_distribution(value_dist, rewards, done, n_atoms, value_max, value_min, delta_z, gamma):
+    # refer to https://github.com/schatty/d4pg-pytorch/blob/7dc23096a45bc4036fbb02493e0b052d57cfe4c6/models/d4pg/l2_projection.py#L7
+    # comments added
+    copy_value_dist = value_dist.data.cpu().numpy()
+    if isinstance(rewards, T.Tensor):
+        copy_rewards = rewards.data.cpu().numpy()
+        copy_done = (1 - done).data.cpu().numpy().astype(np.bool)
+    else:
+        copy_rewards = np.array(rewards).reshape(-1)
+        copy_done = np.array((1 - done)).reshape(-1).astype(np.bool)
+    batch_size = copy_value_dist.shape[0]
+    projected_dist = np.zeros((batch_size, n_atoms), dtype=np.float32)
 
-        # check if a terminal state exists
-        if copy_done.any():
-            projected_dist[copy_done] = 0.0
-            # value at a terminal state should equal to the immediate reward only
-            tz_j = np.clip(copy_rewards[copy_done], a_max=self.value_max, a_min=self.value_min)
-            b_j = (tz_j - self.value_min) / self.delta_z
-            l = np.floor(b_j).astype(np.int64)
-            u = np.ceil(b_j).astype(np.int64)
-            eq_mask = (u == l)
-            eq_dones = copy_done.copy()
-            eq_dones[copy_done] = eq_mask
-            # the value probability is only set to 1.0
-            #       when it is a terminal state and its floor and ceiling indexes are the same
-            if eq_dones.any():
-                projected_dist[eq_dones, l[eq_mask]] = 1.0
-            ne_mask = (u != l)
-            ne_dones = copy_done.copy()
-            ne_dones[copy_done] = ne_mask
-            # the value probability is only distributed while summed to 1.0
-            #       when it is a terminal state and its floor and ceiling indexes differ by 1 index
-            if ne_dones.any():
-                projected_dist[ne_dones, l[ne_mask]] = (u - b_j)[ne_mask]
-                projected_dist[ne_dones, u[ne_mask]] = (b_j - l)[ne_mask]
+    for atom in range(n_atoms):
+        tz_j = np.minimum(value_max, np.maximum(value_min, copy_rewards + (
+                    value_min + atom * delta_z) * gamma))
+        # compute where the next value is on the indexes axis of the support set
+        b_j = (tz_j - value_min) / delta_z
+        # compute floor and ceiling indexes of the next value on the support set
+        l = np.floor(b_j).astype(np.int64)
+        u = np.ceil(b_j).astype(np.int64)
+        # since l and u are floor and ceiling indexes of the next value on the support set, their difference is always 0 at the boundary and 1 otherwise
+        # thus, the predicted probability of the next value is distributed proportional to the difference between the projected value index (b_j) and its floor or ceiling
+        # boundary case, floor == ceiling
+        eq_mask = u == l
+        projected_dist[eq_mask, l[eq_mask]] += copy_value_dist[eq_mask, atom]
+        ne_mask = u != l
+        # otherwise, (u - b_j) + (b_j - l) == 1
+        projected_dist[ne_mask, l[ne_mask]] += copy_value_dist[ne_mask, atom] * (u - b_j)[ne_mask]
+        projected_dist[ne_mask, u[ne_mask]] += copy_value_dist[ne_mask, atom] * (b_j - l)[ne_mask]
 
-        return projected_dist
+    # check if a terminal state exists
+    if copy_done.any():
+        projected_dist[copy_done] = 1.0
+        # value at a terminal state should equal to the immediate reward only
+        tz_j = np.clip(copy_rewards[copy_done], a_max=value_max, a_min=value_min)
+        b_j = (tz_j - value_min) / delta_z
+        l = np.floor(b_j).astype(np.int64)
+        u = np.ceil(b_j).astype(np.int64)
+        eq_mask = (u == l)
+        eq_dones = copy_done.copy()
+        eq_dones[copy_done] = eq_mask
+        # the value probability is only set to 1.0
+        #       when it is a terminal state and its floor and ceiling indexes are the same
+        if eq_dones.any():
+            projected_dist[eq_dones, l[eq_mask]] = 1.0
+        ne_mask = (u != l)
+        ne_dones = copy_done.copy()
+        ne_dones[copy_done] = ne_mask
+        # the value probability is only distributed while summed to 1.0
+        #       when it is a terminal state and its floor and ceiling indexes differ by 1 index
+        if ne_dones.any():
+            projected_dist[ne_dones, l[ne_mask]] = (u - b_j)[ne_mask]
+            projected_dist[ne_dones, u[ne_mask]] = (b_j - l)[ne_mask]
+
+    return projected_dist
