@@ -55,7 +55,7 @@ class Agent(object):
         self.observation_normalization = algo_params['observation_normalization']
         # if using image obs, normalizer returns inputs/255.
         # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
-        self.normalizer = Normalizer(self.state_dim+self.goal_dim,
+        self.normalizer = Normalizer(self.state_dim,
                                      algo_params['init_input_means'], algo_params['init_input_vars'],
                                      image_obs=self.image_obs,
                                      activated=self.observation_normalization)
@@ -86,7 +86,7 @@ class Agent(object):
         else:
             for target_param, param in zip(target.parameters(), source):
                 target_param.data.copy_(
-                    target_param.data * (1.0 - tau) + param.data * tau
+                    target_param.data * (1.0 - tau) + T.tensor(param).float().to(self.device) * tau
                 )
 
     def _save_network(self, keys=None, ep=None):
@@ -189,7 +189,7 @@ class Worker(Agent):
             return False
         print("Worker No. %i downloading network" % self.worker_id)
         for key in keys:
-            self._soft_update(source[key], self.network_dict[key], tau=tau)
+            self._soft_update(source[key], self.network_dict[key], tau=tau, from_params=True)
         return True
 
 
@@ -216,7 +216,7 @@ class Learner(Agent):
     def _upload_learner_networks(self, keys):
         params = dict.fromkeys(keys)
         for key in keys:
-            params[key] = self.network_dict[key].parameters()
+            params[key] = [p.data.cpu().detach().numpy() for p in self.network_dict[key].parameters()]
         try:
             print("Learner uploading network")
             self.queues['network_queue'].put(params)
@@ -278,21 +278,21 @@ class CentralProcessor(object):
         def worker_process(i, seed):
             env = self.env_source.make(self.env_name)
             path = os.path.join(self.path, "worker_%i" % i)
-            worker = self.worker(self.algo_params, env, 'worker', self.queues, path=path, seed=seed, i=i)
+            worker = self.worker(self.algo_params, env, self.queues, path=path, seed=seed, i=i)
             worker.run()
             self.empty_queue('replay_queue')
 
         def learner_process():
             env = self.env_source.make(self.env_name)
             path = os.path.join(self.path, "learner")
-            learner = self.learner(self.algo_params, env, 'learner', self.queues, path=path, seed=0)
+            learner = self.learner(self.algo_params, env, self.queues, path=path, seed=0)
             learner.run()
             if self.prioritised:
                 self.empty_queue('priority_queue')
             self.empty_queue('network_queue')
 
-        def update_central_buffer():
-            while self.queues['learner_steps'].value < self.learner_steps:
+        def update_buffer():
+            while self.queues['learner_step_count'].value < self.learner_steps:
                 num_transitions_in_queue = self.queues['replay_queue'].qsize()
                 for n in range(num_transitions_in_queue):
                     data = self.queues['replay_queue'].get()
@@ -300,7 +300,7 @@ class CentralProcessor(object):
                         self.buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
                     else:
                         self.buffer.store_experience(*data)
-                if self.batch_size > len(self.central_buffer):
+                if self.batch_size > len(self.buffer):
                     continue
 
                 if self.prioritised:
@@ -328,7 +328,7 @@ class CentralProcessor(object):
             self.empty_queue('batch_queue')
 
         processes = []
-        p = T.multiprocessing.Process(target=update_central_buffer)
+        p = T.multiprocessing.Process(target=update_buffer)
         processes.append(p)
         p = T.multiprocessing.Process(target=learner_process)
         processes.append(p)
@@ -347,6 +347,6 @@ class CentralProcessor(object):
             try:
                 data = self.queues[queue_name].get_nowait()
                 del data
-            except:
+            except queue.Empty:
                 break
         self.queues[queue_name].close()

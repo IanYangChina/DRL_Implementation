@@ -1,15 +1,10 @@
-import os
 import time
 import queue
-import importlib
-import multiprocessing as mp
 import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
 from ..utils.networks import Actor, Critic
-from ..utils.replay_buffer import PrioritisedReplayBuffer
-from ..agent_base import Agent, t
 from ..distributed_agent_base import CentralProcessor, Worker, Learner
 from ..utils.exploration_strategy import GaussianNoise
 
@@ -74,7 +69,7 @@ class D4PGWorker(Worker):
         print('Worker No. {} on'.format(self.worker_id))
         num_episode = self.training_episodes
         for ep in range(num_episode):
-            self.queues['num_global_episode'].value += 1
+            self.queues['global_episode_count'].value += 1
             ep_return = self._interact(render, test, sleep=sleep)
             self.statistic_dict['episode_return'].append(ep_return)
             print("'Worker No. %i" % self.worker_id, "Episode %i" % ep, "return %0.1f" % ep_return)
@@ -140,7 +135,7 @@ class D4PGWorker(Worker):
 
 
 class D4PGLearner(Learner):
-    def __init__(self, algo_params, queues, path=None, seed=0):
+    def __init__(self, algo_params, env, queues, path=None, seed=0):
         # environment
         self.env = env
         self.env.seed(seed)
@@ -177,13 +172,13 @@ class D4PGLearner(Learner):
 
     def run(self):
         print('Learner on')
-        while self.queues['learner_steps'].value < self.learner_steps:
+        while self.queues['learner_step_count'].value < self.learner_steps:
             try:
                 batch = self.queues['batch_queue'].get_nowait()
             except queue.Empty:
                 continue
             self._learn(batch=batch)
-            if self.queues['learner_steps'].value % self.learner_upload_gap == 0:
+            if self.queues['learner_step_count'].value % self.learner_upload_gap == 0:
                 self._upload_learner_networks(keys=['actor_target', 'critic_target'])
         print("Saving learner statistics...")
         self._save_statistics()
@@ -251,7 +246,7 @@ class D4PGLearner(Learner):
             self.statistic_dict['critic_loss'].append(critic_loss.detach().mean().cpu().numpy().item())
             self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
 
-            self.queues['learner_steps'].value += 1
+            self.queues['learner_step_count'].value += 1
 
 
 def project_value_distribution(value_dist, rewards, done, n_atoms, value_max, value_min, delta_z, gamma):
