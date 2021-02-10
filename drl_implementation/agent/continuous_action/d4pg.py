@@ -185,6 +185,7 @@ class D4PGLearner(Learner):
             try:
                 batch = self.queues['batch_queue'].get_nowait()
             except queue.Empty:
+                print("empty batch queue")
                 continue
             self._learn(batch=batch)
             if self.queues['learner_step_count'].value % self.learner_upload_gap == 0:
