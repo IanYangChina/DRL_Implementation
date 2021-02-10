@@ -303,16 +303,16 @@ class CentralProcessor(object):
 
         def update_buffer():
             while self.queues['learner_step_count'].value < self.learner_steps:
-                num_transitions_in_queue = self.queues['replay_queue'].qsize()
-                for n in range(num_transitions_in_queue):
-                    data = self.queues['replay_queue'].get()
-                    if self.prioritised:
-                        if self.store_with_given_priority:
-                            self.buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
-                        else:
-                            self.buffer.store_experience(*data)
+                # num_transitions_in_queue = self.queues['replay_queue'].qsize()
+                data = self.queues['replay_queue'].get()
+                if self.prioritised:
+                    if self.store_with_given_priority:
+                        self.buffer.store_experience_with_given_priority(data['priority'], *data['transition'])
                     else:
                         self.buffer.store_experience(*data)
+                else:
+                    self.buffer.store_experience(*data)
+
                 if self.batch_size > len(self.buffer):
                     continue
 
