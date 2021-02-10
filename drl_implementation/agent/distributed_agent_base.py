@@ -329,7 +329,6 @@ class CentralProcessor(object):
                         state, action, next_state, reward, done = batch
                         self.queues['batch_queue'].put_nowait((state, action, next_state, reward, done, weights, inds))
                     except queue.Full:
-                        time.sleep(0.1)
                         continue
                 else:
                     try:
