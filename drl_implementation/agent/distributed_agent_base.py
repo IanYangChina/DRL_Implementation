@@ -196,6 +196,7 @@ class Worker(Agent):
 class Learner(Agent):
     def __init__(self, algo_params, queues, path=None, seed=0):
         self.queues = queues
+        self.num_workers = algo_params['num_workers']
         self.learner_steps = algo_params['learner_steps']
         self.learner_upload_gap = algo_params['learner_upload_gap']  # in optimization steps
         self.actor_learning_rate = algo_params['actor_learning_rate']
@@ -217,11 +218,19 @@ class Learner(Agent):
         params = dict.fromkeys(keys)
         for key in keys:
             params[key] = [p.data.cpu().detach().numpy() for p in self.network_dict[key].parameters()]
-        try:
-            print("Learner uploading network")
-            self.queues['network_queue'].put(params)
-        except queue.Full:
-            pass
+        # empty the queue
+        while True:
+            try:
+                data = self.queues['network_queue'].get_nowait()
+                del data
+            except queue.Empty:
+                break
+        for _ in range(self.num_workers):
+            try:
+                print("Learner uploading network")
+                self.queues['network_queue'].put(params)
+            except queue.Full:
+                pass
 
 
 class CentralProcessor(object):

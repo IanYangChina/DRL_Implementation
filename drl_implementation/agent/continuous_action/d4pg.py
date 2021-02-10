@@ -170,9 +170,7 @@ class D4PGLearner(Learner):
         self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate,
                                      weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
-        # make sure every worker is initialised with the learner
-        for _ in range(algo_params['num_workers']):
-            self._upload_learner_networks(keys=['actor_target', 'critic_target'])
+        self._upload_learner_networks(keys=['actor_target', 'critic_target'])
 
     def run(self):
         print('Learner on')
