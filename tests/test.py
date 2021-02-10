@@ -18,6 +18,7 @@ algo_params = {
     'num_atoms': 51,
     'value_max': 50,
     'value_min': -50,
+    'reward_scaling': 1,
 
     'num_workers': 4,
     'learner_steps': int(1e6),

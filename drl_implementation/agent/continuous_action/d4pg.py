@@ -45,6 +45,7 @@ class D4PGWorker(Worker):
         self.value_max = algo_params['value_max']
         self.value_min = algo_params['value_min']
         self.delta_z = (self.value_max - self.value_min) / (self.num_atoms - 1)
+        self.reward_scaling = algo_params['reward_scaling']
         self.network_dict.update({
             'actor_target': Actor(self.state_dim, self.action_dim).to(self.device),
             'critic_target': Critic(self.state_dim + self.action_dim, self.num_atoms, softmax=True).to(self.device)
@@ -93,6 +94,7 @@ class D4PGWorker(Worker):
                 self.env.render()
             action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
+            reward = reward * self.reward_scaling
             time.sleep(sleep)
             ep_return += reward
             if not test:
