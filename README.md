@@ -19,19 +19,16 @@ Gym-like training environments as possible
 For more use cases, have a look at the [drl_imp_test repo](https://github.com/IanYangChina/drl_imp_test)\
 From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 
-##### Algorithms: Flat
+##### State-based
 - [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
 - [X] DDPG - Deterministic, Continuous
 - [X] TD3 -Deterministic, Continuous
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
-
-##### Algorithms: Distributed
 - [X] D4PG - Deterministic, Continuous
-- [ ] R2D2 - Deterministic, Discrete
 
-##### Algorithms: Hierarchical
-- [ ] HAC - Hindsight, Deterministic, Continuous
-- [ ] UOF - Hindsight, Deterministic, Continuous
+##### Image-based
+- [ ] SAC-AE
+- [ ] DrQ
 
 ##### Replay buffers
 - [X] Hindsight
@@ -39,10 +36,9 @@ From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 
 ##### Tested Environments
 - [X] [Pybullet Gym (Continuous)](https://github.com/bulletphysics/bullet3)
-- [X] OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous)
+- [X] [OpenAI Gym Mujoco Robotics Multigoal Environment (Continuous)](https://openai.com/blog/ingredients-for-robotics-research/)
 - [X] [Pybullet Multigoal Gym](https://github.com/IanYangChina/pybullet_multigoal_gym) (OpenAI Robotics 
 Multigoal Pybullet Migration) (Continuous)
-- [X] OpenAI Gym Mujoco Robotic Multi-goal/task/stage Environment (Continuous)
 
 ##### Some result figures
 <img src="/src/figs.png" width="600"/>
@@ -67,10 +63,3 @@ Multigoal Pybullet Migration) (Continuous)
 * [Time limit](https://arxiv.org/abs/1712.00378)
 * [SOTA PPO Hyperparameters (many applicable to other algorithms)](https://arxiv.org/abs/2006.05990)
 * [SAC Temperature Auto-tuning](https://arxiv.org/abs/1812.05905)
-
-#### Reference Repos
-* [RL-Adventure-DDPG by higgsfield](https://github.com/higgsfield/RL-Adventure-2/blob/master/5.ddpg.ipynb)
-* [OpenAI HER Baseline](https://github.com/openai/baselines/tree/master/baselines/her)
-* [hindsight-experience-replay by TianhongDai](https://github.com/TianhongDai/hindsight-experience-replay)
-* [rlkit](https://github.com/vitchyr/rlkit)
-* [pybullet multigoal gym](https://github.com/IanYangChina/pybullet_multigoal_gym)
