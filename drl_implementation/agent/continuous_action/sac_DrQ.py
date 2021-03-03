@@ -90,9 +90,9 @@ class SACDrQ(Agent):
                 ep_return = self._interact(render, test, sleep=sleep)
                 ep_returns.append(ep_return)
                 if self.env_step_count % 1000 == 0:
-                    self.statistic_dict['env_step_return'].append(np.mean(ep_returns))
+                    self.statistic_dict['env_step_return'].append(np.mean(ep_returns).item())
                     print("Env step %i" % self.env_step_count,
-                          "avg return %0.1f" % self.statistic_dict['env_step_return'][-1].item())
+                          "avg return %0.1f" % self.statistic_dict['env_step_return'][-1])
 
                 if (self.env_step_count % self.testing_gap == 0) and (self.env_step_count != 0) and (not test):
                     ep_test_return = []
@@ -133,6 +133,8 @@ class SACDrQ(Agent):
                     self._learn()
             obs = new_obs
             self.env_step_count += 1
+            if self.env_step_count % 1000 == 0:
+                break
         return ep_return
 
     def _select_action(self, obs, test=False):
