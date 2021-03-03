@@ -20,7 +20,7 @@ class Agent(object):
                  algo_params,
                  transition_tuple=None,
                  image_obs=False, action_type='continuous',
-                 goal_conditioned=False, path=None, seed=-1):
+                 goal_conditioned=False, training_mode='episode_based', path=None, seed=-1):
         # torch device
         self.device = T.device("cuda" if T.cuda.is_available() else "cpu")
         if 'cuda_device_id' in algo_params.keys():
@@ -109,7 +109,11 @@ class Agent(object):
         self.discard_time_limit = algo_params['discard_time_limit']
         self.tau = algo_params['tau']
         self.optim_step_count = 0
+
+        assert training_mode in ['episode_based', 'step_based']
+        self.training_mode = training_mode
         self.env_step_count = 0
+        self.env_episode_count = 0
 
         # network dict is filled in each specific agent
         self.network_dict = {}

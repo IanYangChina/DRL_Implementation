@@ -33,6 +33,7 @@ class SACDrQ(Agent):
         super(SACDrQ, self).__init__(algo_params,
                                      transition_tuple=transition_tuple,
                                      image_obs=True,
+                                     training_mode='step_based',
                                      path=path,
                                      seed=seed)
         # torch
