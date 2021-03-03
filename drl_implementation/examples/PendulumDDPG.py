@@ -75,9 +75,9 @@ seed_returns = []
 path = os.path.dirname(os.path.realpath(__file__))
 for seed in seeds:
 
-    env = pybullet_envs.make("InvertedPendulumSwingupBulletEnv-v0")
+    env = pybullet_envs.make("Walker2DBulletEnv-v0")
     # call render() before training to visualize (pybullet-gym-specific)
-    env.render()
+    # env.render()
     seed_path = path + '/seed'+str(seed)
 
     agent = DDPG(algo_params=ddpg_params, env=env, path=seed_path, seed=seed)

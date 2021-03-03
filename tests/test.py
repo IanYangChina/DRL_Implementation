@@ -1,42 +1,15 @@
-import os
-import drl_implementation
+import pybullet_envs
+import matplotlib.pyplot as plt
+from drl_implementation.agent.utils.env_wrapper import PixelPybulletGym, FrameStack
 
-algo_params = {
-    'prioritised': True,
-    'store_with_given_priority': False,
-    'memory_capacity': int(1e6),
-    'actor_learning_rate': 0.001,
-    'critic_learning_rate': 0.001,
-    'Q_weight_decay': 0.0,
-    'batch_size': 128,
-    'optimization_steps': 1,
-    'tau': 0.001,
-    'discount_factor': 0.99,
-    'discard_time_limit': False,
-    'observation_normalization': False,
-    'num_atoms': 51,
-    'value_max': 1000,
-    'value_min': -1000,
-    'reward_scaling': 1,
-    'gaussian_scale': 0.3,
-    'gaussian_sigma': 1.0,
+env = pybullet_envs.make("Walker2DBulletEnv-v0")
+env = PixelPybulletGym(env, image_size=84, crop_size=140)
+# env = FrameStack(env, k=3)
 
-    'num_workers': 4,
-    'learner_steps': int(1e6),
-    'learner_upload_gap': int(1e3),
-    'worker_update_gap': 3,
-    'replay_queue_size': 64,
-    'priority_queue_size': 64,
-    'batch_queue_size': 64,
+obs = env.reset()
 
-    'training_episodes': 101,
-    'testing_gap': 10,
-    'testing_episodes': 10,
-    'saving_gap': 50,
-}
-
-agent = drl_implementation.D4PG(algo_params,
-                                env_name="InvertedPendulumSwingupBulletEnv-v0",
-                                env_source="pybullet_envs",
-                                path=os.path.dirname(os.path.realpath(__file__)))
-agent.run()
+for _ in range(1000):
+    action = env.action_space.sample()
+    obs_, reward, done, info = env.step(action)
+    plt.imshow(obs_.transpose((1, 2, 0)))
+    plt.pause(0.00001)

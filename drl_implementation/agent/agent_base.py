@@ -69,8 +69,10 @@ class Agent(object):
         if self.goal_conditioned:
             if self.image_obs:
                 self.goal_shape = algo_params['goal_shape']
+                self.goal_dim = 0
             else:
                 self.goal_dim = algo_params['goal_dim']
+
             self.hindsight = algo_params['hindsight']
             if transition_tuple is None:
                 tr = t_goal
@@ -91,13 +93,13 @@ class Agent(object):
             self.goal_dim = 0
 
         # common args
-        self.observation_normalization = algo_params['observation_normalization']
-        # if using image obs, normalizer returns inputs/255.
-        # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
-        self.normalizer = Normalizer(self.state_dim+self.goal_dim,
-                                     algo_params['init_input_means'], algo_params['init_input_vars'],
-                                     image_obs=self.image_obs,
-                                     activated=self.observation_normalization)
+        if not self.image_obs:
+            self.observation_normalization = algo_params['observation_normalization']
+            # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
+            self.normalizer = Normalizer(self.state_dim+self.goal_dim,
+                                         algo_params['init_input_means'], algo_params['init_input_vars'],
+                                         activated=self.observation_normalization)
+
         self.actor_learning_rate = algo_params['actor_learning_rate']
         self.critic_learning_rate = algo_params['critic_learning_rate']
         self.update_interval = algo_params['update_interval']
@@ -148,18 +150,22 @@ class Agent(object):
                 target_param.data * (1.0 - tau) + param.data * tau
             )
 
-    def _save_network(self, keys=None, ep=None):
+    def _save_network(self, keys=None, ep=None, step=None):
         if ep is None:
             ep = ''
         else:
             ep = '_ep'+str(ep)
+        if step is None:
+            step = ''
+        else:
+            step = '_step'+str(step)
         if keys is None:
             keys = self.network_keys_to_save
         assert keys is not None
         for key in keys:
-            T.save(self.network_dict[key].state_dict(), self.ckpt_path+'/ckpt_'+key+ep+'.pt')
+            T.save(self.network_dict[key].state_dict(), self.ckpt_path+'/ckpt_'+key+ep+step+'.pt')
 
-    def _load_network(self, keys=None, ep=None):
+    def _load_network(self, keys=None, ep=None, step=None):
         if not self.image_obs:
             self.normalizer.history_mean = np.load(os.path.join(self.data_path, 'input_means.npy'))
             self.normalizer.history_var = np.load(os.path.join(self.data_path, 'input_vars.npy'))
@@ -167,11 +173,15 @@ class Agent(object):
             ep = ''
         else:
             ep = '_ep'+str(ep)
+        if step is None:
+            step = ''
+        else:
+            step = '_step'+str(step)
         if keys is None:
             keys = self.network_keys_to_save
         assert keys is not None
         for key in keys:
-            self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+'.pt'))
+            self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+step+'.pt'))
 
     def _save_statistics(self):
         if not self.image_obs:

@@ -5,6 +5,7 @@ from .agent.continuous_action.sac_goal_conditioned import GoalConditionedSAC
 from .agent.continuous_action.td3 import TD3
 from .agent.continuous_action.distributional_ddpg import DistributionalDDPG
 from .agent.continuous_action.d4pg import D4PG
+from .agent.continuous_action.sac_DrQ import SACDrQ
 
 agents = {
     'ddpg': DDPG,

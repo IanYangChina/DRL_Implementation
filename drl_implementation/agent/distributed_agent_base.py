@@ -52,14 +52,14 @@ class Agent(object):
             self.action_scaling = algo_params['action_scaling']
 
         # common args
-        # todo: observation in distributed training should be synced as well
-        self.observation_normalization = algo_params['observation_normalization']
-        # if using image obs, normalizer returns inputs/255.
-        # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
-        self.normalizer = Normalizer(self.state_dim,
-                                     algo_params['init_input_means'], algo_params['init_input_vars'],
-                                     image_obs=self.image_obs,
-                                     activated=self.observation_normalization)
+        if not self.image_obs:
+            # todo: observation in distributed training should be synced as well
+            self.observation_normalization = algo_params['observation_normalization']
+            # if using image obs, normalizer returns inputs/255.
+            # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
+            self.normalizer = Normalizer(self.state_dim,
+                                         algo_params['init_input_means'], algo_params['init_input_vars'],
+                                         activated=self.observation_normalization)
 
         self.gamma = algo_params['discount_factor']
         self.tau = algo_params['tau']
