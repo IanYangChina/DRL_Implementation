@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import torch as T
+T.backends.cudnn.benchmark = True
 import torch.nn.functional as F
 import kornia.augmentation as aug
 from torch.optim.adam import Adam
@@ -139,7 +140,7 @@ class SACDrQ(Agent):
         return ep_return
 
     def _select_action(self, obs, test=False):
-        obs = T.tensor([obs], dtype=T.float).to(self.device)
+        obs = T.tensor([obs], dtype=T.float, device=self.device)
         return self.network_dict['actor'].get_action(obs, mean_pi=test).detach().cpu().numpy()[0]
 
     def _learn(self, steps=None):
@@ -151,17 +152,17 @@ class SACDrQ(Agent):
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
-                weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
+                weights = T.tensor(weights, device=self.device).view(self.batch_size, 1)
             else:
                 batch = self.buffer.sample(self.batch_size)
-                weights = T.ones(size=(self.batch_size, 1)).to(self.device)
+                weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
-            vanilla_actor_inputs = T.tensor(batch.state, dtype=T.float32).to(self.device)
-            actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
-            vanilla_actor_inputs_ = T.tensor(batch.next_state, dtype=T.float32).to(self.device)
-            rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
-            done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+            vanilla_actor_inputs = T.tensor(batch.state, dtype=T.float32, device=self.device)
+            actions = T.tensor(batch.action, dtype=T.float32, device=self.device)
+            vanilla_actor_inputs_ = T.tensor(batch.next_state, dtype=T.float32, device=self.device)
+            rewards = T.tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
