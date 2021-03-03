@@ -109,6 +109,10 @@ class SACDrQ(Agent):
 
             print("Finished training")
             print("Saving statistics...")
+            for key in self.statistic_dict.keys():
+                if not T.is_tensor(self.statistic_dict[key][0]):
+                    continue
+                self.statistic_dict[key] = T.tensor(self.statistic_dict[key], device=self.device).cpu().numpy().tolist()
             self._save_statistics()
             self._plot_statistics(x_labels={'env_step_return': 'Environment step (x1e3)',
                                             'env_step_test_return': 'Environment step (x1e4)'})
@@ -203,9 +207,10 @@ class SACDrQ(Agent):
 
             if self.prioritised:
                 assert inds is not None
-                self.buffer.update_priority(inds, np.abs(avg_critic_loss_1.cpu().detach().numpy()))
+                avg_critic_loss_1 = avg_critic_loss_1.detach().cpu().numpy()
+                self.buffer.update_priority(inds, np.abs(avg_critic_loss_1))
 
-            self.statistic_dict['critic_loss'].append(avg_critic_loss_1.detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(avg_critic_loss_1.mean().detach())
 
             if self.optim_step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
@@ -234,8 +239,8 @@ class SACDrQ(Agent):
                 self.alpha_optimizer.step()
                 self.network_dict['alpha'] = self.network_dict['log_alpha'].exp()
 
-                self.statistic_dict['actor_loss'].append(avg_actor_loss.detach().mean().cpu().numpy().item())
-                self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
-                self.statistic_dict['policy_entropy'].append((-aggregated_log_probs/self.q_regularisation_k).detach().mean().cpu().numpy().item())
+                self.statistic_dict['actor_loss'].append(avg_actor_loss.mean().detach())
+                self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach())
+                self.statistic_dict['policy_entropy'].append((-aggregated_log_probs/self.q_regularisation_k).mean().detach())
 
             self.optim_step_count += 1

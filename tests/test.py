@@ -1,15 +1,10 @@
 import pybullet_envs
 import matplotlib.pyplot as plt
 from drl_implementation.agent.utils.env_wrapper import PixelPybulletGym, FrameStack
+import torch as T
+device = T.device("cuda" if T.cuda.is_available() else "cpu")
 
-env = pybullet_envs.make("Walker2DBulletEnv-v0")
-env = PixelPybulletGym(env, image_size=84, crop_size=140)
-# env = FrameStack(env, k=3)
+li = [T.tensor([1.0], device=device), T.tensor([1.0], device=device), T.tensor([1.0], device=device)]
 
-obs = env.reset()
-
-for _ in range(1000):
-    action = env.action_space.sample()
-    obs_, reward, done, info = env.step(action)
-    plt.imshow(obs_.transpose((1, 2, 0)))
-    plt.pause(0.00001)
+li_t = T.tensor(li, device=device)
+print(li_t)
