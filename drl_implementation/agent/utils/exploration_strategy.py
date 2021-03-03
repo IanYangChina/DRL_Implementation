@@ -1,53 +1,9 @@
 import math as M
 import numpy as np
-from copy import deepcopy as dcp
-
-
-class GoalSucRateBasedExpGreed(object):
-    """
-    This exploration class is a goal-success-rate-based exponentially-decaying epsilon-greedy exploration strategy.
-    It modifies the original exponentially-decaying epsilon-greedy exploration strategy by reducing random exploration
-        w.r.t. 1) the overall success rate of goals, and
-               2) the success rate of each goal.
-    """
-
-    def __init__(self, goals, alpha=0.2, threshold=0.02, decay=None, sub_suc_percentage=None):
-        self.alpha = alpha
-        self.threshold = threshold
-        if decay is None:
-            self.decay = 50000
-        else:
-            self.decay = decay
-        if sub_suc_percentage is None:
-            self.sub_suc_percentage = 0.7
-            self.avg_suc_percentage = 1 - self.sub_suc_percentage
-        elif sub_suc_percentage > 1.0:
-            raise ValueError("Sub-goal success rate percentage should be smaller than 1.0")
-        else:
-            self.sub_suc_percentage = sub_suc_percentage
-            self.avg_suc_percentage = 1 - sub_suc_percentage
-        self.goals = goals
-        self.test_success_rates = np.zeros(len(self.goals))
-        self.overall_success_rates = 0.0
-        self.epsilons_start = np.ones(len(self.goals)) + self.threshold
-        self.epsilons_epo = np.ones(len(self.goals)) + self.threshold
-
-    def update_epsilons(self, new_tet_suc_rate):
-        old_tet_suc_rate = dcp(self.test_success_rates)
-        self.test_success_rates = (1 - self.alpha) * old_tet_suc_rate + self.alpha * new_tet_suc_rate
-        self.overall_success_rates = np.mean(self.test_success_rates)
-        self.epsilons_start = 1 - self.sub_suc_percentage * self.test_success_rates - self.avg_suc_percentage * self.overall_success_rates + self.threshold
-
-    def print_epsilons(self, ep):
-        self.epsilons_epo = self.threshold + (self.epsilons_start - self.threshold) * M.exp(-1. * ep / self.decay)
-        return print("Current epsilons", self.epsilons_epo)
-
-    def __call__(self, goal, ep):
-        ind = self.goals.index(goal)
-        return self.threshold + (self.epsilons_start[ind] - self.threshold) * M.exp(-1. * ep / self.decay)
 
 
 class ExpDecayGreedy(object):
+    # e-greedy exploration with exponential decay
     def __init__(self, start=1, end=0.05, decay=50000, decay_start=None, rng=None):
         self.start = start
         self.end = end
@@ -72,6 +28,7 @@ class ExpDecayGreedy(object):
 
 
 class LinearDecayGreedy(object):
+    # e-greedy exploration with linear decay
     def __init__(self, start=1.0, end=0.1, decay=1000000, decay_start=None, rng=None):
         self.start = start
         self.end = end
@@ -92,22 +49,6 @@ class LinearDecayGreedy(object):
         epsilon = self.start - count * (self.start - self.end) / self.decay
         prob = self.rng.uniform(0, 1)
         if prob < epsilon:
-            return True
-        else:
-            return False
-
-
-class ConstantChance(object):
-    def __init__(self, chance=0.2, rng=None):
-        self.chance = chance
-        if rng is None:
-            self.rng = np.random.default_rng(seed=0)
-        else:
-            self.rng = rng
-
-    def __call__(self):
-        chance = self.rng.uniform(0, 1)
-        if chance >= self.chance:
             return True
         else:
             return False
@@ -145,8 +86,65 @@ class GaussianNoise(object):
             self.rng = rng
         self.scale = scale
         self.action_dim = action_dim
-        self.mu = np.ones(self.action_dim)*mu
-        self.sigma = self.mu = np.ones(self.action_dim)*sigma
+        self.mu = mu
+        self.sigma = sigma
 
     def __call__(self):
-        return self.scale*self.rng.normal(loc=self.mu, scale=self.sigma)
+        return self.scale*self.rng.normal(loc=self.mu, scale=self.sigma, size=(self.action_dim,))
+
+
+class ConstantChance(object):
+    def __init__(self, chance=0.2, rng=None):
+        self.chance = chance
+        if rng is None:
+            self.rng = np.random.default_rng(seed=0)
+        else:
+            self.rng = rng
+
+    def __call__(self):
+        chance = self.rng.uniform(0, 1)
+        if chance >= self.chance:
+            return True
+        else:
+            return False
+
+
+class AutoAdjustingConstantChance(object):
+    """
+    https://ieeexplore.ieee.org/document/9366328
+    This exploration class is a goal-success-rate-based auto-adjusting exploration strategy.
+    It modifies the original constant chance exploration strategy by reducing exploration probabilities and noise deviations
+        w.r.t. the testing success rate of each goal.
+    """
+    def __init__(self, goal_num, action_dim, action_max, tau=0.05, chance=0.2, scale=1, mu=0, sigma=0.1, rng=None):
+        if rng is None:
+            self.rng = np.random.default_rng(seed=0)
+        else:
+            self.rng = rng
+        self.scale = scale
+        self.action_dim = action_dim
+        self.action_max = action_max
+        self.mu = mu
+        self.base_sigma = sigma
+        self.sigma = np.ones(self.goal_num) * sigma
+
+        self.base_chance = chance
+        self.goal_num = goal_num
+        self.tau = tau
+        self.success_rates = np.zeros(self.goal_num)
+        self.chance = np.ones(self.goal_num) * chance
+
+    def update_success_rates(self, new_tet_suc_rate):
+        old_tet_suc_rate = self.success_rates.copy()
+        self.success_rates = (1-self.tau)*old_tet_suc_rate + self.tau*new_tet_suc_rate
+        self.chance = self.base_chance*(1-self.success_rates)
+        self.sigma = self.base_sigma*(1-self.success_rates)
+
+    def __call__(self, goal_ind, action):
+        # return a random action or a noisy action
+        prob = self.rng.uniform(0, 1)
+        if prob < self.chance[goal_ind]:
+            return self.rng.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
+        else:
+            noise = self.scale*self.rng.normal(loc=self.mu, scale=self.sigma[goal_ind], size=(self.action_dim,))
+            return action + noise

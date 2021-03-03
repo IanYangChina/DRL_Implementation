@@ -100,7 +100,7 @@ class SACDrQ(Agent):
                     ep_test_return = []
                     for test_ep in range(self.testing_episodes):
                         ep_test_return.append(self._interact(render, test=True))
-                    self.statistic_dict['episode_test_return'].append(sum(ep_test_return) / self.testing_episodes)
+                    self.statistic_dict['env_step_test_return'].append(sum(ep_test_return) / self.testing_episodes)
                     print("Env step %i" % self.env_step_count,
                           "test return %0.1f" % (sum(ep_test_return) / self.testing_episodes))
 

@@ -28,14 +28,13 @@ performed.
 target network is updated softly with tau=0.05.  
 * Adam is used for learning with a learning rate of 0.001, discount factor is 0.98, target value is clipped to 
 [-1/(1-0.98), 0], that is [-50, 0]. I think this is based on the 50 time steps they set for each episode, in which at 
-most an agent could gain -50 return. **The SAC agent doesn't need value clip.**
+most an agent could gain -50 return.
 * For exploration, they randomly select action from uniform distribution with 20% chance; and with 80% chance, they 
-add normal noise into increments along each axes with standard deviation equal to 5% of the max bound. **The SAC agent
-doesn't need a behavioural policy.**
+add normal noise into increments along each axes with standard deviation equal to 5% of the max bound.
 
-* Currently only the RANDOM replay strategy is implemented.
-* The goal-conditioned sac agent doesn't need value clipping.
+* The SAC agent doesn't need a behavioural policy.
+* The goal-conditioned **sac** agent doesn't need value clipping.
 * Prioritised replay supported.
     
-#### Results on the task 'Reach'
-<img src="../src/returns_pybullet_kuka_reach.png" width="250"/>
+#### Results on the task 'Push'
+<img src="../src/push.gif" width="400"/>

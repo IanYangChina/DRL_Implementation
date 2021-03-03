@@ -1,6 +1,7 @@
 import random as R
 import numpy as np
 from .segment_tree import SumSegmentTree, MinSegmentTree
+from collections import namedtuple
 
 
 class ReplayBuffer(object):
@@ -30,24 +31,24 @@ class ReplayBuffer(object):
             assert end is not None
             batch = self.Transition(*zip(*self.memory[start:end]))
 
-        np.save(self.saving_path+'/observations', np.array(batch.observation))
-        np.save(self.saving_path+'/actions', np.array(batch.action))
-        np.save(self.saving_path+'/next_observations', np.array(batch.next_observation))
-        np.save(self.saving_path+'/reward', np.array(batch.reward))
-        np.save(self.saving_path+'/done', np.array(batch.done))
+        np.save(self.saving_path + '/state', np.array(batch.state))
+        np.save(self.saving_path + '/action', np.array(batch.action))
+        np.save(self.saving_path + '/next_state', np.array(batch.next_state))
+        np.save(self.saving_path + '/reward', np.array(batch.reward))
+        np.save(self.saving_path + '/done', np.array(batch.done))
 
     def load_from_npy(self):
         assert self.saving_path is not None
-        observations = np.load(self.saving_path+'/observations.npy')
-        actions = np.load(self.saving_path+'/actions.npy')
-        next_observations = np.load(self.saving_path+'/next_observations.npy')
-        reward = np.load(self.saving_path+'/reward.npy')
-        done = np.load(self.saving_path+'/done.npy')
+        state = np.load(self.saving_path + '/state.npy')
+        action = np.load(self.saving_path + '/action.npy')
+        next_state = np.load(self.saving_path + '/next_state.npy')
+        reward = np.load(self.saving_path + '/reward.npy')
+        done = np.load(self.saving_path + '/done.npy')
 
-        for i in range(observations.shape[0]):
-            self.store_experience(observations[i],
-                                  actions[i],
-                                  next_observations[i],
+        for i in range(state.shape[0]):
+            self.store_experience(state[i],
+                                  action[i],
+                                  next_state[i],
                                   reward[i],
                                   done[i])
 
@@ -123,7 +124,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                     ind = imagined_goals[0][n]
                     goal = imagined_goals[1][n]
                     modified_ep = []
-                    for tr in range(ind+1):
+                    for tr in range(ind + 1):
                         s = ep[tr].state
                         dg = goal
                         a = ep[tr].action
@@ -141,8 +142,8 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                 # 'future' strategy
                 # for each transition, sample k achieved goals after that transition to replace the desired goal
                 ep = self.episodes[_]
-                for tr_ind in range(len(ep)-self.k):
-                    future_inds = R.sample(np.arange(tr_ind+1, len(ep), dtype="int").tolist(), self.k)
+                for tr_ind in range(len(ep) - self.k):
+                    future_inds = R.sample(np.arange(tr_ind + 1, len(ep), dtype="int").tolist(), self.k)
                     modified_ep = []
                     for ind in future_inds:
                         s = ep[tr_ind].state
@@ -161,17 +162,18 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
     def sample_achieved_goal(self, ep):
         goals = [[], []]
         if self.sampling_strategy == 'episode':
-            goals[0] = R.sample(np.arange(len(ep)-20, len(ep), dtype="int").tolist(), self.k)
+            goals[0] = R.sample(np.arange(len(ep) - 20, len(ep), dtype="int").tolist(), self.k)
             for ind in goals[0]:
                 goals[1].append(ep[ind].achieved_goal)
         elif self.sampling_strategy == 'final':
-            goals[0].append(len(ep)-1)
+            goals[0].append(len(ep) - 1)
             goals[1].append(ep[-1].achieved_goal)
         return goals
 
 
 class PrioritisedReplayBuffer(object):
-    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, epsilon=1e-6, rng=None):
+    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, epsilon=1e-6, rng=None, saving_path=None):
+        self.saving_path = saving_path
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:
@@ -250,24 +252,24 @@ class PrioritisedReplayBuffer(object):
             assert end is not None
             batch = self.Transition(*zip(*self.memory[start:end]))
 
-        np.save(self.saving_path+'/observations', np.array(batch.observation))
-        np.save(self.saving_path+'/actions', np.array(batch.action))
-        np.save(self.saving_path+'/next_observations', np.array(batch.next_observation))
-        np.save(self.saving_path+'/reward', np.array(batch.reward))
-        np.save(self.saving_path+'/done', np.array(batch.done))
+        np.save(self.saving_path + '/state', np.array(batch.state))
+        np.save(self.saving_path + '/action', np.array(batch.action))
+        np.save(self.saving_path + '/next_state', np.array(batch.next_state))
+        np.save(self.saving_path + '/reward', np.array(batch.reward))
+        np.save(self.saving_path + '/done', np.array(batch.done))
 
     def load_from_npy(self):
         assert self.saving_path is not None
-        observations = np.load(self.saving_path+'/observations.npy')
-        actions = np.load(self.saving_path+'/actions.npy')
-        next_observations = np.load(self.saving_path+'/next_observations.npy')
-        reward = np.load(self.saving_path+'/reward.npy')
-        done = np.load(self.saving_path+'/done.npy')
+        state = np.load(self.saving_path + '/state.npy')
+        action = np.load(self.saving_path + '/action.npy')
+        next_state = np.load(self.saving_path + '/next_state.npy')
+        reward = np.load(self.saving_path + '/reward.npy')
+        done = np.load(self.saving_path + '/done.npy')
 
-        for i in range(observations.shape[0]):
-            self.store_experience(observations[i],
-                                  actions[i],
-                                  next_observations[i],
+        for i in range(state.shape[0]):
+            self.store_experience(state[i],
+                                  action[i],
+                                  next_state[i],
                                   reward[i],
                                   done[i])
 
@@ -388,7 +390,7 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                     ind = imagined_goals[0][n]
                     goal = imagined_goals[1][n]
                     modified_ep = []
-                    for tr in range(ind+1):
+                    for tr in range(ind + 1):
                         s = ep[tr].state
                         dg = goal
                         a = ep[tr].action
@@ -406,8 +408,8 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                 # 'future' strategy
                 # for each transition, sample k achieved goals after that transition to replace the desired goal
                 ep = self.episodes[_]
-                for tr_ind in range(len(ep)-self.k):
-                    future_inds = R.sample(np.arange(tr_ind+1, len(ep), dtype="int").tolist(), self.k)
+                for tr_ind in range(len(ep) - self.k):
+                    future_inds = R.sample(np.arange(tr_ind + 1, len(ep), dtype="int").tolist(), self.k)
                     modified_ep = []
                     for ind in future_inds:
                         s = ep[tr_ind].state
@@ -426,11 +428,11 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
     def sample_achieved_goal(self, ep):
         goals = [[], []]
         if self.sampling_strategy == 'episode':
-            goals[0] = R.sample(np.arange(len(ep)-20, len(ep), dtype="int").tolist(), self.k)
+            goals[0] = R.sample(np.arange(len(ep) - 20, len(ep), dtype="int").tolist(), self.k)
             for ind in goals[0]:
                 goals[1].append(ep[ind].achieved_goal)
         elif self.sampling_strategy == 'final':
-            goals[0].append(len(ep)-1)
+            goals[0].append(len(ep) - 1)
             goals[1].append(ep[-1].achieved_goal)
         return goals
 
@@ -440,3 +442,35 @@ def goal_distance_reward(goal_a, goal_b):
     assert goal_a.shape == goal_b.shape
     d = np.linalg.norm(goal_a - goal_b, axis=-1)
     return -(d > 0.02).astype(np.float32)
+
+
+def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, rng=None,
+                goal_conditioned=False, sampling_strategy='future', num_sampled_goal=4, terminal_on_achieved=True):
+    t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
+    t_goal = namedtuple("transition",
+                        ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
+
+    if not goal_conditioned:
+        if transition_tuple is None:
+            transition_tuple = t
+        if not prioritised:
+            buffer = ReplayBuffer(mem_capacity, transition_tuple, seed=seed)
+        else:
+            buffer = PrioritisedReplayBuffer(mem_capacity, transition_tuple, rng=rng)
+    else:
+        if transition_tuple is None:
+            transition_tuple = t_goal
+        if not prioritised:
+            buffer = HindsightReplayBuffer(mem_capacity, transition_tuple,
+                                           sampling_strategy=sampling_strategy,
+                                           sampled_goal_num=num_sampled_goal,
+                                           terminate_on_achieve=terminal_on_achieved,
+                                           seed=seed)
+        else:
+            buffer = PrioritisedHindsightReplayBuffer(mem_capacity,
+                                                      transition_tuple,
+                                                      sampling_strategy=sampling_strategy,
+                                                      sampled_goal_num=num_sampled_goal,
+                                                      terminate_on_achieve=terminal_on_achieved,
+                                                      rng=rng)
+    return buffer

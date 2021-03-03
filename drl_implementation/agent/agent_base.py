@@ -2,12 +2,9 @@ import os
 import torch as T
 import numpy as np
 import json
-from collections import namedtuple
 from .utils.plot import smoothed_plot
-from .utils.replay_buffer import *
+from .utils.replay_buffer import make_buffer
 from .utils.normalizer import Normalizer
-t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
-t_goal = namedtuple("transition", ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
 
 
 def mkdir(paths):
@@ -21,6 +18,26 @@ class Agent(object):
                  transition_tuple=None,
                  image_obs=False, action_type='continuous',
                  goal_conditioned=False, training_mode='episode_based', path=None, seed=-1):
+        """
+        Parameters
+        ----------
+        algo_params : dict
+            a dictionary of parameters
+        transition_tuple : collections.namedtuple
+            a python namedtuple for storing, managing and sampling experiences, see .utils.replay_buffer
+        image_obs : bool
+            whether the observations are images
+        action_type : str
+            either 'discrete' or 'continuous'
+        goal_conditioned : bool
+            whether the agent uses a goal-conditioned policy
+        training_mode : str
+            either 'episode_based' or 'env_step_based'
+        path : str
+            a directory to save files
+        seed : int
+            a random seed
+        """
         # torch device
         self.device = T.device("cuda" if T.cuda.is_available() else "cpu")
         if 'cuda_device_id' in algo_params.keys():
@@ -53,44 +70,31 @@ class Agent(object):
             self.action_max = algo_params['action_max']
             self.action_scaling = algo_params['action_scaling']
 
-        # prioritised replay
-        self.prioritised = algo_params['prioritised']
-        # non-goal-conditioned replay buffer
-        tr = transition_tuple
-        if transition_tuple is None:
-            tr = t
-        if not self.prioritised:
-            self.buffer = ReplayBuffer(algo_params['memory_capacity'], tr, seed=seed)
-        else:
-            self.buffer = PrioritisedReplayBuffer(algo_params['memory_capacity'], tr, rng=self.rng)
-
         # goal-conditioned args & buffers
         self.goal_conditioned = goal_conditioned
+        # prioritised replay
+        self.prioritised = algo_params['prioritised']
+
         if self.goal_conditioned:
             if self.image_obs:
-                self.goal_shape = algo_params['goal_shape']
                 self.goal_dim = 0
+                self.goal_shape = algo_params['goal_shape']
             else:
                 self.goal_dim = algo_params['goal_dim']
-
             self.hindsight = algo_params['hindsight']
-            if transition_tuple is None:
-                tr = t_goal
-            if not self.prioritised:
-                self.buffer = HindsightReplayBuffer(algo_params['memory_capacity'], tr,
-                                                    sampling_strategy=algo_params['her_sampling_strategy'],
-                                                    sampled_goal_num=4,
-                                                    terminate_on_achieve=algo_params['terminate_on_achieve'],
-                                                    seed=seed)
-            else:
-                self.buffer = PrioritisedHindsightReplayBuffer(algo_params['memory_capacity'],
-                                                               tr,
-                                                               sampling_strategy=algo_params['her_sampling_strategy'],
-                                                               sampled_goal_num=4,
-                                                               terminate_on_achieve=algo_params['terminate_on_achieve'],
-                                                               rng=self.rng)
+            self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
+                                      transition_tuple=transition_tuple, prioritised=self.prioritised,
+                                      seed=seed, rng=self.rng,
+                                      goal_conditioned=True,
+                                      sampling_strategy=algo_params['her_sampling_strategy'],
+                                      num_sampled_goal=4,
+                                      terminal_on_achieved=algo_params['terminate_on_achieve'])
         else:
             self.goal_dim = 0
+            self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
+                                      transition_tuple=transition_tuple, prioritised=self.prioritised,
+                                      seed=seed, rng=self.rng,
+                                      goal_conditioned=False)
 
         # common args
         if not self.image_obs:
@@ -135,15 +139,15 @@ class Agent(object):
     def _select_action(self, obs, test=False):
         raise NotImplementedError()
 
+    def _learn(self, steps=None):
+        raise NotImplementedError()
+
     def _remember(self, *args, new_episode=False):
         if self.goal_conditioned:
             self.buffer.new_episode = new_episode
             self.buffer.store_experience(*args)
         else:
             self.buffer.store_experience(*args)
-
-    def _learn(self, steps=None):
-        raise NotImplementedError()
 
     def _soft_update(self, source, target, tau=None):
         if tau is None:
@@ -187,11 +191,16 @@ class Agent(object):
         for key in keys:
             self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+step+'.pt'))
 
-    def _save_statistics(self):
+    def _save_statistics(self, keys=None):
         if not self.image_obs:
             np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
             np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
-        json.dump(self.statistic_dict, open(os.path.join(self.data_path, 'statistics.json'), 'w'))
+        if keys is None:
+            keys = self.statistic_dict.keys()
+        for key in keys:
+            if len(self.statistic_dict[key]) == 0:
+                continue
+            json.dump(self.statistic_dict[key], open(os.path.join(self.data_path, key+'.json'), 'w'))
     
     def _plot_statistics(self, keys=None, x_labels=None, y_labels=None, window=5):
         if y_labels is None:
@@ -224,6 +233,8 @@ class Agent(object):
         
         if keys is None:
             for key in list(self.statistic_dict.keys()):
+                if len(self.statistic_dict[key]) == 0:
+                    continue
                 smoothed_plot(os.path.join(self.path, key+'.png'), self.statistic_dict[key],
                               x_label=x_labels[key], y_label=y_labels[key], window=window)
         else:
