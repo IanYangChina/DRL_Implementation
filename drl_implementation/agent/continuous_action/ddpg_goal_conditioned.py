@@ -3,7 +3,7 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from ..utils.networks import Actor, Critic
+from ..utils.networks_mlp import Actor, Critic
 from ..agent_base import Agent
 from ..utils.exploration_strategy import EGreedyGaussian
 

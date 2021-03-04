@@ -3,7 +3,7 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from ..utils.networks import Actor, Critic
+from ..utils.networks_mlp import Actor, Critic
 from ..agent_base import Agent
 from ..utils.exploration_strategy import OUNoise, GaussianNoise
 
@@ -45,7 +45,7 @@ class DDPG(Agent):
         self.critic_optimizer = Adam(self.network_dict['critic'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'], tau=1)
         # behavioural policy args (exploration)
-        self.exploration_strategy = GaussianNoise(self.action_dim, sigma=0.1)
+        self.exploration_strategy = GaussianNoise(self.action_dim, self.action_max, sigma=0.1)
         # training args
         self.warmup_step = algo_params['warmup_step']
         # statistic dict

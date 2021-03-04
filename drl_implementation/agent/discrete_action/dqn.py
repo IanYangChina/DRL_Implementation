@@ -2,14 +2,14 @@ import time
 import numpy as np
 import torch as T
 import torch.nn.functional as F
-from torch.optim.adam import Adam
 from torch.optim.rmsprop import RMSprop
-from ..utils.networks import DQNetwork
+from ..utils.networks_conv import DQNetwork
 from ..agent_base import Agent
-from ..utils.exploration_strategy import ExpDecayGreedy, LinearDecayGreedy
+from ..utils.exploration_strategy import LinearDecayGreedy
 from PIL import Image
 
 
+# todo: use FrameStack wrapper
 class DQN(Agent):
     def __init__(self, algo_params, env, transition_tuple=None, path=None, seed=-1):
         # environment
@@ -164,7 +164,7 @@ class DQN(Agent):
 
     def _select_action(self, obs, test=False):
         if test:
-            obs = T.tensor([obs / 255.], dtype=T.float32).to(self.device)
+            obs = T.tensor([obs], dtype=T.float32).to(self.device)
             with T.no_grad():
                 action = self.network_dict['Q_target'].get_action(obs)
             return action
@@ -172,7 +172,7 @@ class DQN(Agent):
             if self.exploration_strategy(self.env_step_count):
                 action = self.rng.integers(self.action_dim)
             else:
-                obs = T.tensor([obs / 255.], dtype=T.float32).to(self.device)
+                obs = T.tensor([obs], dtype=T.float32).to(self.device)
                 with T.no_grad():
                     action = self.network_dict['Q_target'].get_action(obs)
             return action
@@ -192,9 +192,9 @@ class DQN(Agent):
                 weights = T.ones(size=(self.batch_size, 1)).to(self.device)
                 inds = None
 
-            inputs = T.tensor(batch.state, dtype=T.float32).to(self.device) / 255.
+            inputs = T.tensor(batch.state, dtype=T.float32).to(self.device)
             actions = T.tensor(batch.action, dtype=T.long).unsqueeze(1).to(self.device)
-            inputs_ = T.tensor(batch.next_state, dtype=T.float32).to(self.device) / 255.
+            inputs_ = T.tensor(batch.next_state, dtype=T.float32).to(self.device)
             rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
             done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
 

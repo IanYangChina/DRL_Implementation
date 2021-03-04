@@ -4,7 +4,7 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from ..utils.networks import Actor, Critic
+from ..utils.networks_mlp import Actor, Critic
 from ..distributed_agent_base import CentralProcessor, Worker, Learner
 from ..utils.exploration_strategy import GaussianNoise
 
@@ -61,6 +61,7 @@ class D4PGWorker(Worker):
 
         # behavioural policy (exploration)
         self.exploration_strategy = GaussianNoise(self.action_dim,
+                                                  self.action_max,
                                                   scale=algo_params['gaussian_scale'],
                                                   sigma=algo_params['gaussian_sigma'])
 

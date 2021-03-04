@@ -3,7 +3,7 @@ import numpy as np
 import torch as T
 import torch.nn.functional as F
 from torch.optim.adam import Adam
-from ..utils.networks import StochasticActor, Critic
+from ..utils.networks_mlp import StochasticActor, Critic
 from ..agent_base import Agent
 
 
