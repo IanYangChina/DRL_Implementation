@@ -137,8 +137,8 @@ class SACDrQ(Agent):
                 self._remember(obs, action, new_obs, reward, 1 - int(done))
                 if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                     self._learn()
+                self.env_step_count += 1
             obs = new_obs
-            self.env_step_count += 1
             if self.env_step_count % 1000 == 0:
                 break
         return ep_return

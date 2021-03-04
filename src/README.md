@@ -37,4 +37,4 @@ add normal noise into increments along each axes with standard deviation equal t
 * Prioritised replay supported.
     
 #### Results on the task 'Push'
-<img src="../src/push.gif" width="400"/>
+<img src="./push.gif" width="400"/>

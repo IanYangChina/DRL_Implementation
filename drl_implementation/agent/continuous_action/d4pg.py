@@ -126,8 +126,8 @@ class D4PGWorker(Worker):
                     # currently observation normalization is off
                     self.normalizer.store_history(new_obs)
                     self.normalizer.update_mean()
+                self.env_step_count += 1
             obs = new_obs
-            self.env_step_count += 1
         return ep_return
 
     def _select_action(self, obs, test=False):

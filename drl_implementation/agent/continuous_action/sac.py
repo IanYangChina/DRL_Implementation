@@ -117,8 +117,8 @@ class SAC(Agent):
                     self.normalizer.update_mean()
                 if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                     self._learn()
+                self.env_step_count += 1
             obs = new_obs
-            self.env_step_count += 1
         return ep_return
 
     def _select_action(self, obs, test=False):
