@@ -131,16 +131,16 @@ class Agent(object):
         }
 
     def run(self, render=False, test=False, load_network_ep=None, sleep=0):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _interact(self, render=False, test=False, sleep=0):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _select_action(self, obs, test=False):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _learn(self, steps=None):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _remember(self, *args, new_episode=False):
         if self.goal_conditioned:

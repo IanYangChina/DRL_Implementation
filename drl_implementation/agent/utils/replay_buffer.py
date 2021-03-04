@@ -445,11 +445,12 @@ def goal_distance_reward(goal_a, goal_b):
 
 
 def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, rng=None,
+                # the last 4 args are only for goal-conditioned RL buffers
                 goal_conditioned=False, sampling_strategy='future', num_sampled_goal=4, terminal_on_achieved=True):
     t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
     t_goal = namedtuple("transition",
                         ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
-
+    mem_capacity = int(mem_capacity)
     if not goal_conditioned:
         if transition_tuple is None:
             transition_tuple = t

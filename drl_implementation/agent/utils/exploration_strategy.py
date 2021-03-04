@@ -56,12 +56,13 @@ class LinearDecayGreedy(object):
 
 class OUNoise(object):
     # https://github.com/rll/rllab/blob/master/rllab/exploration_strategies/ou_strategy.py
-    def __init__(self, action_dim, mu=0, theta=0.2, sigma=1.0, rng=None):
+    def __init__(self, action_dim, action_max, mu=0, theta=0.2, sigma=1.0, rng=None):
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:
             self.rng = rng
         self.action_dim = action_dim
+        self.action_max = action_max
         self.mu = mu
         self.theta = theta
         self.sigma = sigma
@@ -71,52 +72,62 @@ class OUNoise(object):
     def reset(self):
         self.state = np.ones(self.action_dim) * self.mu
 
-    def __call__(self):
+    def __call__(self, action):
         x = self.state
         dx = self.theta * (self.mu - x) + self.sigma * self.rng.standard_normal(len(x))
         self.state = x + dx
-        return self.state
+        return np.clip(action + self.state, -self.action_max, self.action_max)
 
 
 class GaussianNoise(object):
-    def __init__(self, action_dim, scale=1, mu=0, sigma=0.1, rng=None):
+    # the one used in the TD3 paper: http://proceedings.mlr.press/v80/fujimoto18a/fujimoto18a.pdf
+    def __init__(self, action_dim, action_max, scale=1, mu=0, sigma=0.1, rng=None):
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:
             self.rng = rng
         self.scale = scale
         self.action_dim = action_dim
+        self.action_max = action_max
         self.mu = mu
         self.sigma = sigma
 
-    def __call__(self):
-        return self.scale*self.rng.normal(loc=self.mu, scale=self.sigma, size=(self.action_dim,))
+    def __call__(self, action):
+        noise = self.scale*self.rng.normal(loc=self.mu, scale=self.sigma, size=(self.action_dim,))
+        return np.clip(action + noise, -self.action_max, self.action_max)
 
 
-class ConstantChance(object):
-    def __init__(self, chance=0.2, rng=None):
+class EGreedyGaussian(object):
+    # the one used in the HER paper: https://arxiv.org/abs/1707.01495
+    def __init__(self, action_dim, action_max, chance=0.2, scale=1, mu=0, sigma=0.1, rng=None):
         self.chance = chance
+        self.scale = scale
+        self.action_dim = action_dim
+        self.action_max = action_max
+        self.mu = mu
+        self.sigma = sigma
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:
             self.rng = rng
 
-    def __call__(self):
+    def __call__(self, action):
         chance = self.rng.uniform(0, 1)
-        if chance >= self.chance:
-            return True
+        if chance < self.chance:
+            return self.rng.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
         else:
-            return False
+            noise = self.scale*self.rng.normal(loc=self.mu, scale=self.sigma, size=(self.action_dim,))
+            return np.clip(action + noise, -self.action_max, self.action_max)
 
 
-class AutoAdjustingConstantChance(object):
+class AutoAdjustingEGreedyGaussian(object):
     """
     https://ieeexplore.ieee.org/document/9366328
     This exploration class is a goal-success-rate-based auto-adjusting exploration strategy.
     It modifies the original constant chance exploration strategy by reducing exploration probabilities and noise deviations
         w.r.t. the testing success rate of each goal.
     """
-    def __init__(self, goal_num, action_dim, action_max, tau=0.05, chance=0.2, scale=1, mu=0, sigma=0.1, rng=None):
+    def __init__(self, goal_num, action_dim, action_max, tau=0.05, chance=0.2, scale=1, mu=0, sigma=0.2, rng=None):
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:

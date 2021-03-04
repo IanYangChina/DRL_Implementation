@@ -6,29 +6,32 @@
 Gym-like training environments as possible
 - The package is under active development, use the latest version with caution
 - It is recommended to use the [released version](https://github.com/IanYangChina/DRL_Implementation/releases/tag/v1.0)
+- Understand more with the [Wiki!](https://github.com/IanYangChina/DRL_Implementation/wiki)
 - Tested environments: Gym, Pybullet-gym, Pybullet-multigoal-gym
 - *My priority is on continuous action algorithms as I'm working on robotics*
 
 #### Installation
-`git clone https://github.com/IanYangChina/DRL_Implementation.git` \
-`cd DRL_Implementation` \
-`python -m pip install -r requirements.txt`\
-`python -m pip install .` \
+```
+git clone https://github.com/IanYangChina/DRL_Implementation.git
+cd DRL_Implementation
+python -m pip install -r requirements.txt
+python -m pip install .
+```
 [Click here for example codes](https://github.com/IanYangChina/DRL_Implementation/tree/master/drl_implementation/examples)
 , to run the codes you will need to install Gym, Pybullet, or pybullet-multigoal-gym. See env installation links below.
 For more use cases, have a look at the [drl_imp_test repo](https://github.com/IanYangChina/drl_imp_test)\
 From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 
 ##### State-based
-- [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
 - [X] DDPG - Deterministic, Continuous
 - [X] TD3 -Deterministic, Continuous
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
 - [X] D4PG - Deterministic, Continuous
 
 ##### Image-based
-- [ ] SAC-AE
-- [ ] DrQ
+- [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
+- [ ] SAC-AE - Continuous
+- [ ] DrQ - Continuous
 
 ##### Replay buffers
 - [X] Hindsight
@@ -54,10 +57,10 @@ Multigoal Pybullet Migration) (Continuous)
 * [SAC (Adaptive Temperature)](https://arxiv.org/pdf/1812.05905.pdf)
 * [PER](https://arxiv.org/abs/1511.05952)
 * [HER](http://papers.nips.cc/paper/7090-hindsight-experience-replay)
-* [HAC](https://arxiv.org/abs/1712.00948)
-* [OptionFramework](https://www.sciencedirect.com/science/article/pii/S0004370299000521)
 * [D4PG](https://arxiv.org/abs/1804.08617)
 * [R2D2](https://openreview.net/pdf?id=r1lyTjAqYX)
+* [SAC-AE](https://arxiv.org/pdf/1910.01741.pdf)
+* [DrQ](https://arxiv.org/abs/2004.13649)
 
 #### Reference Papers: Implementation Matters
 * [Time limit](https://arxiv.org/abs/1712.00378)

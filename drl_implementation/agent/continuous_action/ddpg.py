@@ -125,8 +125,7 @@ class DDPG(Agent):
             return np.clip(action, -self.action_max, self.action_max)
         else:
             # explore
-            noise = self.exploration_strategy()
-            return np.clip(action + noise, -self.action_max, self.action_max)
+            return self.exploration_strategy(action)
 
     def _learn(self, steps=None):
         if len(self.buffer) < self.batch_size:

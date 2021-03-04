@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.optim.adam import Adam
 from ..utils.networks import Actor, Critic
 from ..agent_base import Agent
-from ..utils.exploration_strategy import ConstantChance
+from ..utils.exploration_strategy import EGreedyGaussian
 
 
 class GoalConditionedDDPG(Agent):
@@ -54,7 +54,10 @@ class GoalConditionedDDPG(Agent):
         # behavioural policy args (exploration)
         # different from the original DDPG paper, the HER paper uses another exploration strategy
         #   paper: https://papers.nips.cc/paper/2017/hash/453fadbd8a1a3af50a9df4df899537b5-Abstract.html
-        self.exploration_strategy = ConstantChance(chance=algo_params['random_action_chance'], rng=self.rng)
+        self.exploration_strategy = EGreedyGaussian(action_dim=self.action_dim,
+                                                    action_max=self.action_max,
+                                                    chance=algo_params['random_action_chance'],
+                                                    sigma=algo_params['noise_deviation'], rng=self.rng)
         self.noise_deviation = algo_params['noise_deviation']
         # training args
         self.clip_value = algo_params['clip_value']
@@ -156,15 +159,10 @@ class GoalConditionedDDPG(Agent):
                 action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
             return np.clip(action, -self.action_max, self.action_max)
         # train
-        explore = self.exploration_strategy()
-        if explore:
-            return self.rng.uniform(-self.action_max, self.action_max, size=(self.action_dim,))
-        else:
-            with T.no_grad():
-                inputs = T.tensor(inputs, dtype=T.float).to(self.device)
-                noise = self.noise_deviation * self.rng.standard_normal(size=self.action_dim)
-                action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
-                return np.clip(action + noise, -self.action_max, self.action_max)
+        with T.no_grad():
+            inputs = T.tensor(inputs, dtype=T.float).to(self.device)
+            action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
+            return self.exploration_strategy(action)
 
     def _learn(self, steps=None):
         if self.hindsight:

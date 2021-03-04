@@ -55,7 +55,6 @@ class Agent(object):
         if not self.image_obs:
             # todo: observation in distributed training should be synced as well
             self.observation_normalization = algo_params['observation_normalization']
-            # if using image obs, normalizer returns inputs/255.
             # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
             self.normalizer = Normalizer(self.state_dim,
                                          algo_params['init_input_means'], algo_params['init_input_vars'],
@@ -169,13 +168,13 @@ class Worker(Agent):
         super(Worker, self).__init__(algo_params, path=path, seed=seed)
 
     def run(self, render=False, test=False, load_network_ep=None, sleep=0):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _interact(self, render=False, test=False, sleep=0):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _select_action(self, obs, test=False):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _remember(self, batch):
         try:
@@ -210,10 +209,10 @@ class Learner(Agent):
         super(Learner, self).__init__(algo_params, path=path, seed=seed)
 
     def run(self):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _learn(self, steps=None):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _upload_learner_networks(self, keys):
         print("Learner uploading network")

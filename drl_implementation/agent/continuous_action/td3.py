@@ -49,7 +49,7 @@ class TD3(Agent):
         self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         # behavioural policy args (exploration)
-        self.exploration_strategy = GaussianNoise(self.action_dim, mu=0, sigma=0.1)
+        self.exploration_strategy = GaussianNoise(self.action_dim, self.action_max, mu=0, sigma=0.1)
         # training args
         self.target_noise = algo_params['target_noise']
         self.noise_clip = algo_params['noise_clip']
@@ -131,8 +131,7 @@ class TD3(Agent):
             return np.clip(action, -self.action_max, self.action_max)
         else:
             # explore
-            noise = self.exploration_strategy()
-            return np.clip(action + noise, -self.action_max, self.action_max)
+            return self.exploration_strategy(action)
 
     def _learn(self, steps=None):
         if len(self.buffer) < self.batch_size:
