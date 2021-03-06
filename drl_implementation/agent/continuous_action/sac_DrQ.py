@@ -97,6 +97,7 @@ class SACDrQ(Agent):
                     self.statistic_dict['env_step_return'].append(step_returns)
                     print("Env step %i" % self.env_step_count,
                           "avg return %0.1f" % self.statistic_dict['env_step_return'][-1])
+                    step_returns = 0
 
                 if (self.env_step_count % self.testing_gap == 0) and (self.env_step_count != 0) and (not test):
                     ep_test_return = []
