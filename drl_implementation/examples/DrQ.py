@@ -1,4 +1,4 @@
-# this example runs a DrQ agent on a pendulum swingup task from dm_control suite
+# this example runs a DrQ agent on the walker2D task from pybullet-gym
 
 import os
 import pybullet_envs

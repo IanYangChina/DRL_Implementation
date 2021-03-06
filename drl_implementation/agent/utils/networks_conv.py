@@ -215,6 +215,18 @@ class PixelEncoder(nn.Module):
             self.convs[i].bias = source.convs[i].bias
 
 
+class PixelDecoder(nn.Module):
+    def __init__(self, obs_shape, feature_dim=50, num_layers=4, num_filters=32):
+        # the encoder architecture adopted by SAC-AE, DrQ and CURL
+        super(PixelDecoder, self).__init__()
+        assert len(obs_shape) == 3
+        self.obs_shape = obs_shape[-2:]
+        self.feature_dim = feature_dim
+        self.num_layers = num_layers
+
+    # todo
+
+
 def weight_init(m):
     """Custom weight init for Conv2D and Linear layers."""
     if isinstance(m, nn.Linear):

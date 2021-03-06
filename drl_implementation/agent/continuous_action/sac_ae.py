@@ -10,8 +10,8 @@ from ..agent_base import Agent
 T.backends.cudnn.benchmark = True
 
 
-class SACDrQ(Agent):
-    # https://arxiv.org/abs/2004.13649
+class SACAE(Agent):
+    # https://arxiv.org/pdf/1910.01741.pdf
     def __init__(self, algo_params, env, transition_tuple=None, path=None, seed=-1):
         # environment
         self.env = PixelPybulletGym(env,
@@ -32,21 +32,24 @@ class SACDrQ(Agent):
         self.testing_episodes = algo_params['testing_episodes']
         self.saving_gap = algo_params['saving_gap']
 
-        super(SACDrQ, self).__init__(algo_params,
-                                     transition_tuple=transition_tuple,
-                                     image_obs=True,
-                                     training_mode='step_based',
-                                     path=path,
-                                     seed=seed)
+        super(SACAE, self).__init__(algo_params,
+                                    transition_tuple=transition_tuple,
+                                    image_obs=True,
+                                    training_mode='step_based',
+                                    path=path,
+                                    seed=seed)
         # torch
         self.encoder = PixelEncoder(self.state_shape)
         self.encoder_target = PixelEncoder(self.state_shape)
         self.network_dict.update({
-            'actor': StochasticConvActor(self.action_dim, encoder=self.encoder, detach_obs_encoder=True).to(self.device),
+            'actor': StochasticConvActor(self.action_dim, encoder=self.encoder, detach_obs_encoder=True).to(
+                self.device),
             'critic_1': ConvCritic(self.action_dim, encoder=self.encoder, detach_obs_encoder=False).to(self.device),
-            'critic_1_target': ConvCritic(self.action_dim, encoder=self.encoder_target, detach_obs_encoder=True).to(self.device),
+            'critic_1_target': ConvCritic(self.action_dim, encoder=self.encoder_target, detach_obs_encoder=True).to(
+                self.device),
             'critic_2': ConvCritic(self.action_dim, encoder=self.encoder, detach_obs_encoder=False).to(self.device),
-            'critic_2_target': ConvCritic(self.action_dim, encoder=self.encoder_target, detach_obs_encoder=True).to(self.device),
+            'critic_2_target': ConvCritic(self.action_dim, encoder=self.encoder_target, detach_obs_encoder=True).to(
+                self.device),
             'alpha': algo_params['alpha'],
             'log_alpha': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
@@ -112,12 +115,9 @@ class SACDrQ(Agent):
             print("Finished training")
             print("Saving statistics...")
             for key in self.statistic_dict.keys():
-                try:
-                    if not T.is_tensor(self.statistic_dict[key][0]):
-                        continue
-                    self.statistic_dict[key] = T.tensor(self.statistic_dict[key], device=self.device).cpu().numpy().tolist()
-                except:
+                if not T.is_tensor(self.statistic_dict[key][0]):
                     continue
+                self.statistic_dict[key] = T.tensor(self.statistic_dict[key], device=self.device).cpu().numpy().tolist()
             self._save_statistics()
             self._plot_statistics(x_labels={'env_step_return': 'Environment step (x1e3)',
                                             'env_step_test_return': 'Environment step (x1e4)'})
@@ -185,7 +185,7 @@ class SACDrQ(Agent):
                     value_2_ = self.network_dict['critic_2_target'](actor_inputs_, actions_)
                     value_ = T.min(value_1_, value_2_) - (self.network_dict['alpha'] * log_probs_)
                     average_value_target = average_value_target + (rewards + done * self.gamma * value_)
-            value_target = average_value_target/self.q_regularisation_k
+            value_target = average_value_target / self.q_regularisation_k
 
             self.critic_1_optimizer.zero_grad()
             self.critic_2_optimizer.zero_grad()
@@ -203,9 +203,9 @@ class SACDrQ(Agent):
                 aggregated_critic_loss_2 = aggregated_critic_loss_2 + critic_loss_2
 
             # backward the both losses before calling .step(), or it will throw CudaRuntime error
-            avg_critic_loss_1 = aggregated_critic_loss_1/self.q_regularisation_k
+            avg_critic_loss_1 = aggregated_critic_loss_1 / self.q_regularisation_k
             (avg_critic_loss_1 * weights).mean().backward()
-            avg_critic_loss_2 = aggregated_critic_loss_2/self.q_regularisation_k
+            avg_critic_loss_2 = aggregated_critic_loss_2 / self.q_regularisation_k
             (avg_critic_loss_2 * weights).mean().backward()
             self.critic_1_optimizer.step()
             self.critic_2_optimizer.step()
@@ -233,12 +233,14 @@ class SACDrQ(Agent):
                     aggregated_log_probs = aggregated_log_probs + new_log_probs
                     new_values = T.min(self.network_dict['critic_1'](actor_inputs, new_actions),
                                        self.network_dict['critic_2'](actor_inputs, new_actions))
-                    aggregated_actor_loss = aggregated_actor_loss + (self.network_dict['alpha'] * new_log_probs - new_values).mean()
-                    aggregated_alpha_loss = aggregated_alpha_loss + (self.network_dict['log_alpha'] * (-new_log_probs - self.target_entropy).detach()).mean()
+                    aggregated_actor_loss = aggregated_actor_loss + (
+                                self.network_dict['alpha'] * new_log_probs - new_values).mean()
+                    aggregated_alpha_loss = aggregated_alpha_loss + (
+                                self.network_dict['log_alpha'] * (-new_log_probs - self.target_entropy).detach()).mean()
 
-                avg_actor_loss = aggregated_actor_loss/self.q_regularisation_k
+                avg_actor_loss = aggregated_actor_loss / self.q_regularisation_k
                 avg_actor_loss.backward()
-                avg_alpha_loss = aggregated_alpha_loss/self.q_regularisation_k
+                avg_alpha_loss = aggregated_alpha_loss / self.q_regularisation_k
                 avg_alpha_loss.backward()
                 self.actor_optimizer.step()
                 self.alpha_optimizer.step()
@@ -246,6 +248,7 @@ class SACDrQ(Agent):
 
                 self.statistic_dict['actor_loss'].append(avg_actor_loss.mean().detach())
                 self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach())
-                self.statistic_dict['policy_entropy'].append((-aggregated_log_probs/self.q_regularisation_k).mean().detach())
+                self.statistic_dict['policy_entropy'].append(
+                    (-aggregated_log_probs / self.q_regularisation_k).mean().detach())
 
             self.optim_step_count += 1
