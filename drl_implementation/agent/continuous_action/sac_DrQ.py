@@ -8,7 +8,7 @@ from ..utils.env_wrapper import FrameStack, PixelPybulletGym
 from ..utils.networks_conv import PixelEncoder, StochasticConvActor, ConvCritic
 from ..agent_base import Agent
 T.backends.cudnn.benchmark = True
-scaler = T.cuda.amp.GradScaler()
+# scaler = T.cuda.amp.GradScaler()
 
 
 class SACDrQ(Agent):
