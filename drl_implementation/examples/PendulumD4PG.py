@@ -19,6 +19,7 @@ algo_params = {
     'num_atoms': 51,
     'value_max': 50,
     'value_min': -50,
+    'reward_scaling': 1,
 
     'num_workers': 4,
     'learner_steps': int(1e6),
@@ -34,8 +35,9 @@ algo_params = {
     'saving_gap': 50,
 }
 
-agent = drl_implementation.D4PG(algo_params,
-                                env_name="InvertedPendulumSwingupBulletEnv-v0",
-                                env_source="pybullet_envs",
-                                path=os.path.dirname(os.path.realpath(__file__)))
-agent.run()
+if __name__ == '__main__':
+    agent = drl_implementation.D4PG(algo_params,
+                                    env_name="InvertedPendulumSwingupBulletEnv-v0",
+                                    env_source="pybullet_envs",
+                                    path=os.path.dirname(os.path.realpath(__file__))+'/d4pg')
+    agent.run()

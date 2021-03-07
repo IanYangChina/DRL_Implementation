@@ -26,12 +26,12 @@ From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 - [X] DDPG - Deterministic, Continuous
 - [X] TD3 -Deterministic, Continuous
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
-- [X] D4PG - Deterministic, Continuous
+- [ ] D4PG - Deterministic, Continuous ***-debugging-***
 
 ##### Image-based
-- [ ] DQN - Deterministic, Discrete (LSTM network for Atari)
-- [ ] SAC-AE - Continuous
-- [ ] DrQ - Continuous
+- [ ] DQN - Deterministic, Discrete (LSTM network for Atari) ***-debugging-***
+- [ ] SAC-AE - Continuous ***-to be built-***
+- [ ] DrQ - Continuous ***-debugging-***
 
 ##### Replay buffers
 - [X] Hindsight

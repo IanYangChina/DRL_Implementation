@@ -8,9 +8,9 @@ import importlib
 import multiprocessing as mp
 from collections import namedtuple
 from .utils.plot import smoothed_plot
-from .utils.replay_buffer import *
+from .utils.replay_buffer import ReplayBuffer, PrioritisedReplayBuffer
 from .utils.normalizer import Normalizer
-
+# T.multiprocessing.set_start_method('spawn')
 t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
 
 
