@@ -26,7 +26,7 @@ From the project root, run `python drl_implementation/examples/$SCTIPT_NAME.py`
 - [X] DDPG - Deterministic, Continuous
 - [X] TD3 -Deterministic, Continuous
 - [X] SAC (Adaptive Temperature) - Stochastic, Continuous
-- [ ] D4PG - Deterministic, Continuous ***-debugging-***
+- [ ] D4PG - Deterministic, Continuous ***-only work for torch 1.4.0, fix it later-***
 
 ##### Image-based
 - [ ] DQN - Deterministic, Discrete (LSTM network for Atari) ***-debugging-***
