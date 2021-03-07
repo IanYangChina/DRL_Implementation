@@ -144,9 +144,9 @@ class SACDrQ(Agent):
                 if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
                     self._learn()
                 self.env_step_count += 1
+                if self.env_step_count % 1000 == 0:
+                    break
             obs = new_obs
-            if self.env_step_count % 1000 == 0:
-                break
         return ep_return
 
     def _select_action(self, obs, test=False):
