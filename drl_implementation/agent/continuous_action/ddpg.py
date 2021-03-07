@@ -83,8 +83,7 @@ class DDPG(Agent):
         if not test:
             print("Finished training")
             print("Saving statistics...")
-            self._save_statistics()
-            self._plot_statistics()
+            self._plot_statistics(save_to_file=True)
         else:
             print("Finished testing")
 
@@ -118,7 +117,7 @@ class DDPG(Agent):
     def _select_action(self, obs, test=False):
         obs = self.normalizer(obs)
         with T.no_grad():
-            inputs = T.tensor(obs, dtype=T.float).to(self.device)
+            inputs = T.as_tensor(obs, dtype=T.float, device=self.device)
             action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
         if test:
             # evaluate
@@ -136,27 +135,27 @@ class DDPG(Agent):
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
-                weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
+                weights = T.as_tensor(weights, device=self.device).view(self.batch_size, 1)
             else:
                 batch = self.buffer.sample(self.batch_size)
-                weights = T.ones(size=(self.batch_size, 1)).to(self.device)
+                weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
             actor_inputs = self.normalizer(batch.state)
-            actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
-            actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
-            critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
+            actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
+            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            critic_inputs = T.cat((actor_inputs, actions), dim=1)
             actor_inputs_ = self.normalizer(batch.next_state)
-            actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
-            rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
-            done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+            actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
+            rewards = T.as_tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.as_tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
 
             with T.no_grad():
                 actions_ = self.network_dict['actor_target'](actor_inputs_)
-                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
+                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1)
                 value_ = self.network_dict['critic_target'](critic_inputs_)
                 value_target = rewards + done * self.gamma * value_
 
@@ -180,5 +179,5 @@ class DDPG(Agent):
             self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
             self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'])
 
-            self.statistic_dict['critic_loss'].append(critic_loss.detach().mean().cpu().numpy().item())
-            self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(critic_loss.detach().mean())
+            self.statistic_dict['actor_loss'].append(actor_loss.detach().mean())

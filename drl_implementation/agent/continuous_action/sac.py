@@ -90,8 +90,7 @@ class SAC(Agent):
         if not test:
             print("Finished training")
             print("Saving statistics...")
-            self._save_statistics()
-            self._plot_statistics()
+            self._plot_statistics(save_to_file=True)
         else:
             print("Finished testing")
 
@@ -123,7 +122,7 @@ class SAC(Agent):
 
     def _select_action(self, obs, test=False):
         inputs = self.normalizer(obs)
-        inputs = T.tensor(inputs, dtype=T.float).to(self.device)
+        inputs = T.as_tensor(inputs, dtype=T.float, device=self.device)
         return self.network_dict['actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
 
     def _learn(self, steps=None):
@@ -142,20 +141,20 @@ class SAC(Agent):
                 inds = None
 
             actor_inputs = self.normalizer(batch.state)
-            actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
-            actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
-            critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
+            actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
+            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            critic_inputs = T.cat((actor_inputs, actions), dim=1)
             actor_inputs_ = self.normalizer(batch.next_state)
-            actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
-            rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
-            done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+            actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
+            rewards = T.as_tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.as_tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
 
             with T.no_grad():
                 actions_, log_probs_ = self.network_dict['actor'].get_action(actor_inputs_, probs=True)
-                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
+                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1)
                 value_1_ = self.network_dict['critic_1_target'](critic_inputs_)
                 value_2_ = self.network_dict['critic_2_target'](critic_inputs_)
                 value_ = T.min(value_1_, value_2_) - (self.network_dict['alpha'] * log_probs_)
@@ -177,7 +176,7 @@ class SAC(Agent):
             (critic_loss_2 * weights).mean().backward()
             self.critic_2_optimizer.step()
 
-            self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(critic_loss_1.detach().mean())
 
             if self.optim_step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
@@ -186,7 +185,7 @@ class SAC(Agent):
             if self.optim_step_count % self.actor_update_interval == 0:
                 self.actor_optimizer.zero_grad()
                 new_actions, new_log_probs = self.network_dict['actor'].get_action(actor_inputs, probs=True)
-                critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
+                critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1)
                 new_values = T.min(self.network_dict['critic_1'](critic_eval_inputs),
                                    self.network_dict['critic_2'](critic_eval_inputs))
                 actor_loss = (self.network_dict['alpha']*new_log_probs - new_values).mean()
@@ -199,8 +198,8 @@ class SAC(Agent):
                 self.alpha_optimizer.step()
                 self.network_dict['alpha'] = self.network_dict['log_alpha'].exp()
 
-                self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
-                self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach().cpu().numpy().item())
-                self.statistic_dict['policy_entropy'].append(-new_log_probs.detach().mean().cpu().numpy().item())
+                self.statistic_dict['actor_loss'].append(actor_loss.detach().mean())
+                self.statistic_dict['alpha'].append(self.network_dict['alpha'].detach())
+                self.statistic_dict['policy_entropy'].append(-new_log_probs.detach().mean())
 
             self.optim_step_count += 1

@@ -2,9 +2,30 @@ import pybullet_envs
 import matplotlib.pyplot as plt
 from drl_implementation.agent.utils.env_wrapper import PixelPybulletGym, FrameStack
 import torch as T
-device = T.device("cuda" if T.cuda.is_available() else "cpu")
+import numpy as np
+import time
+device = T.device("cuda")
+a = ((2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333),
+     (2.0, 2.0, 2.20, 2.0, 2.2, 3.333))
 
-li = [T.tensor([1.0], device=device), T.tensor([1.0], device=device), T.tensor([1.0], device=device)]
+start = time.time()
+b = T.tensor([a], device=device)
+print(time.time() - start)
+print(b.size())
 
-li_t = T.tensor(li, device=device)
-print(li_t)
+start = time.time()
+c = T.as_tensor([np.array(a)], device=device)
+print(time.time() - start)
+print(c.size())
+
+start = time.time()
+d = T.as_tensor([a], device=device)
+print(time.time() - start)
+print(d.size())

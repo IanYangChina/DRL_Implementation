@@ -133,7 +133,7 @@ class D4PGWorker(Worker):
     def _select_action(self, obs, test=False):
         obs = self.normalizer(obs)
         with T.no_grad():
-            inputs = T.tensor(obs, dtype=T.float).to(self.device)
+            inputs = T.as_tensor(obs, dtype=T.float, device=self.device)
             action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
         if test:
             # evaluate
@@ -164,7 +164,7 @@ class D4PGLearner(Learner):
         self.value_max = algo_params['value_max']
         self.value_min = algo_params['value_min']
         self.delta_z = (self.value_max - self.value_min) / (self.num_atoms - 1)
-        self.support = T.linspace(self.value_min, self.value_max, steps=self.num_atoms).to(self.device)
+        self.support = T.linspace(self.value_min, self.value_max, steps=self.num_atoms, device=self.device)
 
         self.network_dict.update({
             'actor': Actor(self.state_dim, self.action_dim).to(self.device),
@@ -191,8 +191,7 @@ class D4PGLearner(Learner):
             if self.queues['learner_step_count'].value % self.learner_upload_gap == 0:
                 self._upload_learner_networks(keys=['actor_target', 'critic_target'])
         print("Saving learner statistics...")
-        self._save_statistics()
-        self._plot_statistics(keys=['actor_loss', 'critic_loss'])
+        self._plot_statistics(keys=['actor_loss', 'critic_loss'], save_to_file=True)
         print('Learner shutdown')
 
     def _learn(self, steps=None, batch=None):
@@ -204,30 +203,30 @@ class D4PGLearner(Learner):
         for i in range(steps):
             if self.prioritised:
                 state, action, next_state, reward, done, weights, inds = batch
-                weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
+                weights = T.as_tensor(weights, device=self.device).view(self.batch_size, 1)
             else:
                 state, action, next_state, reward, done = batch
-                weights = T.ones(size=(self.batch_size, 1)).to(self.device)
+                weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
             actor_inputs = self.normalizer(state)
-            actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
-            actions = T.tensor(action, dtype=T.float32).to(self.device)
-            critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
+            actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
+            actions = T.as_tensor(action, dtype=T.float32, device=self.device)
+            critic_inputs = T.cat((actor_inputs, actions), dim=1)
             actor_inputs_ = self.normalizer(next_state)
-            actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
-            rewards = T.tensor(reward, dtype=T.float32).to(self.device)
-            done = T.tensor(done, dtype=T.float32).to(self.device)
+            actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
+            rewards = T.as_tensor(reward, dtype=T.float32, device=self.device)
+            done = T.as_tensor(done, dtype=T.float32, device=self.device)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
 
             with T.no_grad():
                 actions_ = self.network_dict['actor_target'](actor_inputs_)
-                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
+                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1)
                 value_dist_ = self.network_dict['critic_target'](critic_inputs_)
                 value_dist_target = project_value_distribution(value_dist_, rewards, done, self.num_atoms, self.value_max, self.value_min, self.delta_z, self.gamma)
-                value_dist_target = T.from_numpy(value_dist_target).to(self.device)
+                value_dist_target = T.as_tensor(value_dist_target, device=self.device)
 
             self.critic_optimizer.zero_grad()
             value_dist_estimate = self.network_dict['critic'](critic_inputs)
@@ -253,8 +252,8 @@ class D4PGLearner(Learner):
             self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
             self._soft_update(self.network_dict['critic'], self.network_dict['critic_target'])
 
-            self.statistic_dict['critic_loss'].append(critic_loss.detach().mean().cpu().numpy().item())
-            self.statistic_dict['actor_loss'].append(actor_loss.detach().mean().cpu().numpy().item())
+            self.statistic_dict['critic_loss'].append(critic_loss.detach().mean())
+            self.statistic_dict['actor_loss'].append(actor_loss.detach().mean())
 
             self.queues['learner_step_count'].value += 1
 

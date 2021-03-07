@@ -37,8 +37,10 @@ class GoalConditionedDDPG(Agent):
                                                   seed=seed)
         # torch
         self.network_dict.update({
-            'actor': Actor(self.state_dim + self.goal_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
-            'actor_target': Actor(self.state_dim + self.goal_dim, self.action_dim, action_scaling=self.action_scaling).to(self.device),
+            'actor': Actor(self.state_dim + self.goal_dim, self.action_dim, action_scaling=self.action_scaling).to(
+                self.device),
+            'actor_target': Actor(self.state_dim + self.goal_dim, self.action_dim,
+                                  action_scaling=self.action_scaling).to(self.device),
             'critic_1': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_1_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_2': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
@@ -47,9 +49,11 @@ class GoalConditionedDDPG(Agent):
         self.network_keys_to_save = ['actor_target', 'critic_1_target', 'critic_2_target']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
         self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'], tau=1)
-        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
+        self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate,
+                                       weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'], tau=1)
-        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate, weight_decay=algo_params['Q_weight_decay'])
+        self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate,
+                                       weight_decay=algo_params['Q_weight_decay'])
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
         # behavioural policy args (exploration)
         # different from the original DDPG paper, the HER paper uses another exploration strategy
@@ -115,11 +119,12 @@ class GoalConditionedDDPG(Agent):
         if not test:
             print("Finished training")
             print("Saving statistics...")
-            self._save_statistics()
-            self._plot_statistics(x_labels={
-                'critic_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
-                'actor_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)'
-            })
+            self._plot_statistics(
+                x_labels={
+                    'critic_loss': 'Optimization epoch (per ' + str(self.optimizer_steps) + ' steps)',
+                    'actor_loss': 'Optimization epoch (per ' + str(self.optimizer_steps) + ' steps)'
+                },
+                save_to_file=True)
         else:
             print("Finished testing")
 
@@ -152,16 +157,14 @@ class GoalConditionedDDPG(Agent):
     def _select_action(self, obs, test=False):
         inputs = np.concatenate((obs['state'], obs['desired_goal']), axis=0)
         inputs = self.normalizer(inputs)
-        # evaluate
-        if test:
-            with T.no_grad():
-                inputs = T.tensor(inputs, dtype=T.float).to(self.device)
-                action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
-            return np.clip(action, -self.action_max, self.action_max)
-        # train
         with T.no_grad():
-            inputs = T.tensor(inputs, dtype=T.float).to(self.device)
+            inputs = T.as_tensor(inputs, dtype=T.float, device=self.device)
             action = self.network_dict['actor_target'](inputs).cpu().detach().numpy()
+        if test:
+            # evaluate
+            return np.clip(action, -self.action_max, self.action_max)
+        else:
+            # explore
             return self.exploration_strategy(action)
 
     def _learn(self, steps=None):
@@ -173,12 +176,12 @@ class GoalConditionedDDPG(Agent):
         if steps is None:
             steps = self.optimizer_steps
 
-        critic_losses = []
-        actor_losses = []
+        critic_losses = T.zeros(1, device=self.device)
+        actor_losses = T.zeros(1, device=self.device)
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
-                weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
+                weights = T.as_tensor(weights).view(self.batch_size, 1).to(self.device)
             else:
                 batch = self.buffer.sample(self.batch_size)
                 weights = T.ones(size=(self.batch_size, 1)).to(self.device)
@@ -186,21 +189,21 @@ class GoalConditionedDDPG(Agent):
 
             actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
             actor_inputs = self.normalizer(actor_inputs)
-            actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
-            actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
-            critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
+            actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
+            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            critic_inputs = T.cat((actor_inputs, actions), dim=1)
             actor_inputs_ = np.concatenate((batch.next_state, batch.desired_goal), axis=1)
             actor_inputs_ = self.normalizer(actor_inputs_)
-            actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
-            rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
-            done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+            actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
+            rewards = T.as_tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.as_tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
 
             with T.no_grad():
                 actions_ = self.network_dict['actor_target'](actor_inputs_)
-                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
+                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1)
                 value_1_ = self.network_dict['critic_1_target'](critic_inputs_)
                 value_2_ = self.network_dict['critic_2_target'](critic_inputs_)
                 value_ = T.min(value_1_, value_2_)
@@ -232,12 +235,12 @@ class GoalConditionedDDPG(Agent):
             actor_loss.backward()
             self.actor_optimizer.step()
 
-            critic_losses.append(critic_loss_1.detach().mean().cpu().numpy().item())
-            actor_losses.append(actor_loss.detach().mean().cpu().numpy().item())
+            critic_losses += critic_loss_1.detach().mean()
+            actor_losses += actor_loss.detach().mean()
 
             self._soft_update(self.network_dict['actor'], self.network_dict['actor_target'])
             self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
             self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'])
 
-        self.statistic_dict['critic_loss'].append(np.mean(critic_losses))
-        self.statistic_dict['actor_loss'].append(np.mean(actor_losses))
+        self.statistic_dict['critic_loss'].append(critic_losses / steps)
+        self.statistic_dict['actor_loss'].append(actor_losses / steps)

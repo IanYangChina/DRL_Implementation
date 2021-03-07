@@ -37,7 +37,8 @@ class GoalConditionedSAC(Agent):
                                                  seed=seed)
         # torch
         self.network_dict.update({
-            'actor': StochasticActor(self.state_dim + self.goal_dim, self.action_dim, log_std_min=-6, log_std_max=1, action_scaling=self.action_scaling).to(self.device),
+            'actor': StochasticActor(self.state_dim + self.goal_dim, self.action_dim, log_std_min=-6, log_std_max=1,
+                                     action_scaling=self.action_scaling).to(self.device),
             'critic_1': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_1_target': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
             'critic_2': Critic(self.state_dim + self.goal_dim + self.action_dim, 1).to(self.device),
@@ -112,13 +113,14 @@ class GoalConditionedSAC(Agent):
         if not test:
             print("Finished training")
             print("Saving statistics...")
-            self._save_statistics()
-            self._plot_statistics(x_labels={
-                'critic_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
-                'actor_loss': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
-                'alpha': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)',
-                'policy_entropy': 'Optimization epoch (per '+str(self.optimizer_steps)+' steps)'
-            })
+            self._plot_statistics(
+                x_labels={
+                    'critic_loss': 'Optimization epoch (per ' + str(self.optimizer_steps) + ' steps)',
+                    'actor_loss': 'Optimization epoch (per ' + str(self.optimizer_steps) + ' steps)',
+                    'alpha': 'Optimization epoch (per ' + str(self.optimizer_steps) + ' steps)',
+                    'policy_entropy': 'Optimization epoch (per ' + str(self.optimizer_steps) + ' steps)'
+                },
+                save_to_file=True)
         else:
             print("Finished testing")
 
@@ -151,7 +153,7 @@ class GoalConditionedSAC(Agent):
     def _select_action(self, obs, test=False):
         inputs = np.concatenate((obs['state'], obs['desired_goal']), axis=0)
         inputs = self.normalizer(inputs)
-        inputs = T.tensor(inputs, dtype=T.float).to(self.device)
+        inputs = T.as_tensor(inputs, dtype=T.float).to(self.device)
         return self.network_dict['actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
 
     def _learn(self, steps=None):
@@ -163,36 +165,36 @@ class GoalConditionedSAC(Agent):
         if steps is None:
             steps = self.optimizer_steps
 
-        critic_losses = []
-        actor_losses = []
-        alphas = []
-        policy_entropies = []
+        critic_losses = T.zeros(1, device=self.device)
+        actor_losses = T.zeros(1, device=self.device)
+        alphas = T.zeros(1, device=self.device)
+        policy_entropies = T.zeros(1, device=self.device)
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
-                weights = T.tensor(weights).view(self.batch_size, 1).to(self.device)
+                weights = T.as_tensor(weights, device=self.device).view(self.batch_size, 1)
             else:
                 batch = self.buffer.sample(self.batch_size)
-                weights = T.ones(size=(self.batch_size, 1)).to(self.device)
+                weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
             actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
             actor_inputs = self.normalizer(actor_inputs)
-            actor_inputs = T.tensor(actor_inputs, dtype=T.float32).to(self.device)
-            actions = T.tensor(batch.action, dtype=T.float32).to(self.device)
-            critic_inputs = T.cat((actor_inputs, actions), dim=1).to(self.device)
+            actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
+            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            critic_inputs = T.cat((actor_inputs, actions), dim=1)
             actor_inputs_ = np.concatenate((batch.next_state, batch.desired_goal), axis=1)
             actor_inputs_ = self.normalizer(actor_inputs_)
-            actor_inputs_ = T.tensor(actor_inputs_, dtype=T.float32).to(self.device)
-            rewards = T.tensor(batch.reward, dtype=T.float32).unsqueeze(1).to(self.device)
-            done = T.tensor(batch.done, dtype=T.float32).unsqueeze(1).to(self.device)
+            actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
+            rewards = T.as_tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.as_tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
 
             with T.no_grad():
                 actions_, log_probs_ = self.network_dict['actor'].get_action(actor_inputs_, probs=True)
-                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1).to(self.device)
+                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1)
                 value_1_ = self.network_dict['critic_1_target'](critic_inputs_)
                 value_2_ = self.network_dict['critic_2_target'](critic_inputs_)
                 value_ = T.min(value_1_, value_2_) - (self.network_dict['alpha'] * log_probs_)
@@ -215,7 +217,7 @@ class GoalConditionedSAC(Agent):
             (critic_loss_2 * weights).mean().backward()
             self.critic_2_optimizer.step()
 
-            critic_losses.append(critic_loss_1.detach().mean().cpu().numpy().item())
+            critic_losses += critic_loss_1.detach().mean()
 
             if self.optim_step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
@@ -223,7 +225,8 @@ class GoalConditionedSAC(Agent):
 
             if self.optim_step_count % self.actor_update_interval == 0:
                 self.actor_optimizer.zero_grad()
-                new_actions, new_log_probs, entropy = self.network_dict['actor'].get_action(actor_inputs, probs=True, entropy=True)
+                new_actions, new_log_probs, entropy = self.network_dict['actor'].get_action(actor_inputs, probs=True,
+                                                                                            entropy=True)
                 critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
                 new_values = T.min(self.network_dict['critic_1'](critic_eval_inputs),
                                    self.network_dict['critic_2'](critic_eval_inputs))
@@ -237,13 +240,13 @@ class GoalConditionedSAC(Agent):
                 self.alpha_optimizer.step()
                 self.network_dict['alpha'] = self.network_dict['log_alpha'].exp()
 
-                actor_losses.append(actor_loss.detach().mean().cpu().numpy().item())
-                alphas.append(self.network_dict['alpha'].detach().cpu().numpy().item())
-                policy_entropies.append(entropy.detach().mean().cpu().numpy().item())
+                actor_losses += actor_loss.detach()
+                alphas += self.network_dict['alpha'].detach()
+                policy_entropies += entropy.detach().mean()
 
             self.optim_step_count += 1
 
-        self.statistic_dict['critic_loss'].append(np.mean(critic_losses))
-        self.statistic_dict['actor_loss'].append(np.mean(actor_losses))
-        self.statistic_dict['alpha'].append(np.mean(alphas))
-        self.statistic_dict['policy_entropy'].append(np.mean(policy_entropies))
+        self.statistic_dict['critic_loss'].append(critic_losses / steps)
+        self.statistic_dict['actor_loss'].append(actor_losses / steps)
+        self.statistic_dict['alpha'].append(alphas / steps)
+        self.statistic_dict['policy_entropy'].append(policy_entropies / steps)

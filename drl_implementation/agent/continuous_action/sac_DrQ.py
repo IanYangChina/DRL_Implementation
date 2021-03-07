@@ -8,6 +8,7 @@ from ..utils.env_wrapper import FrameStack, PixelPybulletGym
 from ..utils.networks_conv import PixelEncoder, StochasticConvActor, ConvCritic
 from ..agent_base import Agent
 T.backends.cudnn.benchmark = True
+scaler = T.cuda.amp.GradScaler()
 
 
 class SACDrQ(Agent):
@@ -112,16 +113,9 @@ class SACDrQ(Agent):
 
             print("Finished training")
             print("Saving statistics...")
-            for key in self.statistic_dict.keys():
-                try:
-                    if not T.is_tensor(self.statistic_dict[key][0]):
-                        continue
-                    self.statistic_dict[key] = T.tensor(self.statistic_dict[key], device=self.device).cpu().numpy().tolist()
-                except:
-                    continue
-            self._save_statistics()
             self._plot_statistics(x_labels={'env_step_return': 'Environment step (x1e3)',
-                                            'env_step_test_return': 'Environment step (x1e4)'})
+                                            'env_step_test_return': 'Environment step (x1e4)'},
+                                  save_to_file=True)
 
     def _interact(self, render=False, test=False, sleep=0):
         done = False
@@ -150,7 +144,7 @@ class SACDrQ(Agent):
         return ep_return
 
     def _select_action(self, obs, test=False):
-        obs = T.tensor([obs], dtype=T.float, device=self.device)
+        obs = T.as_tensor([obs], dtype=T.float, device=self.device)
         return self.network_dict['actor'].get_action(obs, mean_pi=test).detach().cpu().numpy()[0]
 
     def _learn(self, steps=None):
@@ -162,17 +156,17 @@ class SACDrQ(Agent):
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
-                weights = T.tensor(weights, device=self.device).view(self.batch_size, 1)
+                weights = T.as_tensor(weights, device=self.device).view(self.batch_size, 1)
             else:
                 batch = self.buffer.sample(self.batch_size)
                 weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
-            vanilla_actor_inputs = T.tensor(batch.state, dtype=T.float32, device=self.device)
-            actions = T.tensor(batch.action, dtype=T.float32, device=self.device)
-            vanilla_actor_inputs_ = T.tensor(batch.next_state, dtype=T.float32, device=self.device)
-            rewards = T.tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
-            done = T.tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
+            vanilla_actor_inputs = T.as_tensor(batch.state, dtype=T.float32, device=self.device)
+            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            vanilla_actor_inputs_ = T.as_tensor(batch.next_state, dtype=T.float32, device=self.device)
+            rewards = T.as_tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.as_tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1

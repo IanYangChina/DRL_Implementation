@@ -114,13 +114,25 @@ class Agent(object):
         for key in keys:
             self.network_dict[key].load_state_dict(T.load(self.ckpt_path + '/ckpt_' + key + ep + '.pt'))
 
-    def _save_statistics(self):
+    def _save_statistics(self, keys=None):
         if not self.image_obs:
             np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
             np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
-        json.dump(self.statistic_dict, open(os.path.join(self.data_path, 'statistics.json'), 'w'))
+        if keys is None:
+            keys = self.statistic_dict.keys()
+        for key in keys:
+            if len(self.statistic_dict[key]) == 0:
+                continue
+            # convert everything to a list before save via json
+            if T.is_tensor(self.statistic_dict[key][0]):
+                self.statistic_dict[key] = T.as_tensor(self.statistic_dict[key], device=self.device).cpu().numpy().tolist()
+            else:
+                self.statistic_dict[key] = np.array(self.statistic_dict[key]).tolist()
+            json.dump(self.statistic_dict[key], open(os.path.join(self.data_path, key+'.json'), 'w'))
 
-    def _plot_statistics(self, keys=None, x_labels=None, y_labels=None, window=5):
+    def _plot_statistics(self, keys=None, x_labels=None, y_labels=None, window=5, save_to_file=True):
+        if save_to_file:
+            self._save_statistics(keys=keys)
         if y_labels is None:
             y_labels = {}
         for key in list(self.statistic_dict.keys()):
