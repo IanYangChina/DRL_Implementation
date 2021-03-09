@@ -155,7 +155,7 @@ class GoalConditionedDDPG(Agent):
         return ep_return
 
     def _select_action(self, obs, test=False):
-        inputs = np.concatenate((obs['state'], obs['desired_goal']), axis=0)
+        inputs = np.concatenate((obs['observation'], obs['desired_goal']), axis=0)
         inputs = self.normalizer(inputs)
         with T.no_grad():
             inputs = T.as_tensor(inputs, dtype=T.float, device=self.device)

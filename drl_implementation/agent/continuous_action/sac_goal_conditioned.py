@@ -14,7 +14,7 @@ class GoalConditionedSAC(Agent):
         self.env.seed(seed)
         obs = self.env.reset()
         print(obs['state'].shape)
-        algo_params.update({'state_dim': obs['observationvvv'].shape[0],
+        algo_params.update({'state_dim': obs['observation'].shape[0],
                             'goal_dim': obs['desired_goal'].shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
@@ -151,7 +151,7 @@ class GoalConditionedSAC(Agent):
         return ep_return
 
     def _select_action(self, obs, test=False):
-        inputs = np.concatenate((obs['state'], obs['desired_goal']), axis=0)
+        inputs = np.concatenate((obs['observation'], obs['desired_goal']), axis=0)
         inputs = self.normalizer(inputs)
         inputs = T.as_tensor(inputs, dtype=T.float).to(self.device)
         return self.network_dict['actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
