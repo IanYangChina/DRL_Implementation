@@ -437,11 +437,11 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
         return goals
 
 
-def goal_distance_reward(goal_a, goal_b):
+def goal_distance_reward(goal_a, goal_b, distance_threshold=0.05):
     # sparse distance-based reward function for goal-conditioned env
     assert goal_a.shape == goal_b.shape
     d = np.linalg.norm(goal_a - goal_b, axis=-1)
-    return -(d > 0.02).astype(np.float32)
+    return -(d > distance_threshold).astype(np.float32)
 
 
 def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, rng=None,
