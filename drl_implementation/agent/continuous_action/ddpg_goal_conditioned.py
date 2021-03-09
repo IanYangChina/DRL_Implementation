@@ -146,8 +146,8 @@ class GoalConditionedDDPG(Agent):
                                new_obs['observation'], new_obs['achieved_goal'], reward, 1 - int(done),
                                new_episode=new_episode)
                 if self.observation_normalization:
-                    self.normalizer.store_history(np.concatenate((new_obs['state'],
-                                                                  new_obs['desired_goal']), axis=0))
+                    self.normalizer.store_history(np.concatenate((new_obs['observation'],
+                                                                  new_obs['achieved_goal']), axis=0))
             obs = new_obs
             new_episode = False
         self.normalizer.update_mean()
