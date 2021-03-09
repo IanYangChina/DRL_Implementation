@@ -14,7 +14,7 @@ class GoalConditionedSAC(Agent):
         self.env.seed(seed)
         obs = self.env.reset()
         print(obs['state'].shape)
-        algo_params.update({'state_dim': obs['state'].shape[0],
+        algo_params.update({'state_dim': obs['observationvvv'].shape[0],
                             'goal_dim': obs['desired_goal'].shape[0],
                             'action_dim': self.env.action_space.shape[0],
                             'action_max': self.env.action_space.high,
@@ -138,8 +138,8 @@ class GoalConditionedSAC(Agent):
             time.sleep(sleep)
             ep_return += reward
             if not test:
-                self._remember(obs['state'], obs['desired_goal'], action,
-                               new_obs['state'], new_obs['achieved_goal'], reward, 1 - int(done),
+                self._remember(obs['observation'], obs['desired_goal'], action,
+                               new_obs['observation'], new_obs['achieved_goal'], reward, 1 - int(done),
                                new_episode=new_episode)
                 if self.observation_normalization:
                     self.normalizer.store_history(np.concatenate((new_obs['state'],
