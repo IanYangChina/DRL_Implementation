@@ -22,6 +22,9 @@ class GoalConditionedDDPG(Agent):
                             'init_input_means': None,
                             'init_input_vars': None
                             })
+        self.curriculum = False
+        if 'curriculum' in algo_params.keys():
+            self.curriculum = algo_params['curriculum']
         # training args
         self.training_epochs = algo_params['training_epochs']
         self.training_cycles = algo_params['training_cycles']
@@ -85,6 +88,8 @@ class GoalConditionedDDPG(Agent):
             print("Start training...")
 
         for epo in range(self.training_epochs):
+            if self.curriculum:
+                self.env.activate_curriculum_update()
             for cyc in range(self.training_cycles):
                 cycle_return = 0
                 cycle_success = 0
@@ -101,6 +106,8 @@ class GoalConditionedDDPG(Agent):
                       "success rate %0.1f" % (cycle_success / self.training_episodes))
 
             if (epo % self.testing_gap == 0) and (epo != 0) and (not test):
+                if self.curriculum:
+                    self.env.deactivate_curriculum_update()
                 # testing during training
                 test_return = 0
                 test_success = 0
@@ -131,6 +138,8 @@ class GoalConditionedDDPG(Agent):
     def _interact(self, render=False, test=False, sleep=0):
         done = False
         obs = self.env.reset()
+        if self.curriculum:
+            self.env.max_episode_steps = self.env.env.curriculum_goal_step
         ep_return = 0
         new_episode = True
         # start a new episode

@@ -88,7 +88,8 @@ class Agent(object):
                                       goal_conditioned=True,
                                       sampling_strategy=algo_params['her_sampling_strategy'],
                                       num_sampled_goal=4,
-                                      terminal_on_achieved=algo_params['terminate_on_achieve'])
+                                      terminal_on_achieved=algo_params['terminate_on_achieve'],
+                                      goal_distance_threshold=self.env.env.distance_threshold)
         else:
             self.goal_dim = 0
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
