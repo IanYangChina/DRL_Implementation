@@ -139,7 +139,7 @@ class GoalConditionedDDPG(Agent):
         done = False
         obs = self.env.reset()
         if self.curriculum:
-            self.env.max_episode_steps = self.env.env.curriculum_goal_step
+            self.env._max_episode_steps = self.env.env.curriculum_goal_step
         ep_return = 0
         new_episode = True
         # start a new episode
