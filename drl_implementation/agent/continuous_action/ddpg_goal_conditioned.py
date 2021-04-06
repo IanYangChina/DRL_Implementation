@@ -159,8 +159,9 @@ class GoalConditionedDDPG(Agent):
                                                                   new_obs['achieved_goal']), axis=0))
             obs = new_obs
             new_episode = False
-        self.normalizer.update_mean()
-        self._learn()
+        if not test:
+            self.normalizer.update_mean()
+            self._learn()
         return ep_return
 
     def _select_action(self, obs, test=False):
