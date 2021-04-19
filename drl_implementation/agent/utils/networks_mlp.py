@@ -50,11 +50,13 @@ class StochasticActor(nn.Module):
         log_std = T.clamp(log_std, self.log_std_min, self.log_std_max)
         return mean, log_std
     
-    def get_action(self, inputs, epsilon=1e-6, mean_pi=False, probs=False, entropy=False):
+    def get_action(self, inputs, std_scale=None, epsilon=1e-6, mean_pi=False, probs=False, entropy=False):
         mean, log_std = self(inputs)
         if mean_pi:
             return mean
         std = log_std.exp()
+        if std_scale is not None:
+            std *= std_scale
         mu = Normal(mean, std)
         z = mu.rsample()
         action = T.tanh(z)
@@ -70,10 +72,12 @@ class StochasticActor(nn.Module):
                 entropy = mu.entropy()
                 return action * self.action_scaling, log_probs, entropy
 
-    def get_log_probs(self, inputs, actions):
+    def get_log_probs(self, inputs, actions, std_scale=None):
         actions /= self.action_scaling
         mean, log_std = self(inputs)
         std = log_std.exp()
+        if std_scale is not None:
+            std *= std_scale
         mu = Normal(mean, std)
         log_probs = mu.log_prob(actions)
         entropy = mu.entropy()
