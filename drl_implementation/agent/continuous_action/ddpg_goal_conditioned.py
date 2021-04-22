@@ -96,7 +96,7 @@ class GoalConditionedDDPG(Agent):
                 for ep in range(self.training_episodes):
                     ep_return = self._interact(render, test, sleep=sleep)
                     cycle_return += ep_return
-                    if ep_return > -50:
+                    if ep_return > -self.env._max_episode_steps:
                         cycle_success += 1
 
                 self.statistic_dict['cycle_return'].append(cycle_return / self.training_episodes)
@@ -114,7 +114,7 @@ class GoalConditionedDDPG(Agent):
                 for test_ep in range(self.testing_episodes):
                     ep_test_return = self._interact(render, test=True)
                     test_return += ep_test_return
-                    if ep_test_return > -50:
+                    if ep_test_return > -self.env._max_episode_steps:
                         test_success += 1
                 self.statistic_dict['epoch_test_return'].append(test_return / self.testing_episodes)
                 self.statistic_dict['epoch_test_success_rate'].append(test_success / self.testing_episodes)
@@ -159,8 +159,9 @@ class GoalConditionedDDPG(Agent):
                                                                   new_obs['achieved_goal']), axis=0))
             obs = new_obs
             new_episode = False
-        self.normalizer.update_mean()
-        self._learn()
+        if not test:
+            self.normalizer.update_mean()
+            self._learn()
         return ep_return
 
     def _select_action(self, obs, test=False):
