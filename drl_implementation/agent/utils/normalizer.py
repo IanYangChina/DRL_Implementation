@@ -34,7 +34,7 @@ class Normalizer(object):
         new_mean = np.mean(new_history, axis=0)
 
         new_var = np.sum(np.square(new_history - new_mean), axis=0)
-        new_var = (self.sample_count * self.history_var + new_var)
+        new_var = (self.sample_count * np.square(self.history_var) + new_var)
         new_var /= (new_sample_num + self.sample_count)
         self.history_var = np.sqrt(new_var)
 
