@@ -190,7 +190,7 @@ class Agent(object):
             keys = self.network_keys_to_save
         assert keys is not None
         for key in keys:
-            self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+step+'.pt'))
+            self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+step+'.pt', map_location=self.device))
 
     def _save_statistics(self, keys=None):
         if not self.image_obs:
