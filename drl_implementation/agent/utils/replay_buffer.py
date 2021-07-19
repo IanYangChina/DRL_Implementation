@@ -121,6 +121,8 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
             # 'episode' or 'final' strategy
             for _ in range(len(self.episodes)):
                 ep = self.episodes[_]
+                if len(ep) < self.k:
+                    continue
                 imagined_goals = self.sample_achieved_goal(ep)
                 for n in range(len(imagined_goals[0])):
                     ind = imagined_goals[0][n]
@@ -144,6 +146,8 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                 # 'future' strategy
                 # for each transition, sample k achieved goals after that transition to replace the desired goal
                 ep = self.episodes[_]
+                if len(ep) < self.k:
+                    continue
                 for tr_ind in range(len(ep) - self.k):
                     future_inds = R.sample(np.arange(tr_ind + 1, len(ep), dtype="int").tolist(), self.k)
                     modified_ep = []
@@ -389,6 +393,8 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
             for _ in range(len(self.episodes)):
                 # 'episode' or 'final' strategy
                 ep = self.episodes[_]
+                if len(ep) < self.k:
+                    continue
                 imagined_goals = self.sample_achieved_goal(ep)
                 for n in range(len(imagined_goals[0])):
                     ind = imagined_goals[0][n]
@@ -412,6 +418,8 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                 # 'future' strategy
                 # for each transition, sample k achieved goals after that transition to replace the desired goal
                 ep = self.episodes[_]
+                if len(ep) < self.k:
+                    continue
                 for tr_ind in range(len(ep) - self.k):
                     future_inds = R.sample(np.arange(tr_ind + 1, len(ep), dtype="int").tolist(), self.k)
                     modified_ep = []
