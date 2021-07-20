@@ -168,7 +168,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
     def sample_achieved_goal(self, ep):
         goals = [[], []]
         if self.sampling_strategy == 'episode':
-            goals[0] = R.sample(np.arange(len(ep) - 20, len(ep), dtype="int").tolist(), self.k)
+            goals[0] = R.sample(np.arange(0, len(ep), dtype="int").tolist(), self.k)
             for ind in goals[0]:
                 goals[1].append(ep[ind].achieved_goal)
         elif self.sampling_strategy == 'final':
@@ -440,7 +440,7 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
     def sample_achieved_goal(self, ep):
         goals = [[], []]
         if self.sampling_strategy == 'episode':
-            goals[0] = R.sample(np.arange(len(ep) - 20, len(ep), dtype="int").tolist(), self.k)
+            goals[0] = R.sample(np.arange(0, len(ep), dtype="int").tolist(), self.k)
             for ind in goals[0]:
                 goals[1].append(ep[ind].achieved_goal)
         elif self.sampling_strategy == 'final':
