@@ -17,7 +17,7 @@ class Agent(object):
                  algo_params,
                  transition_tuple=None,
                  image_obs=False, action_type='continuous',
-                 goal_conditioned=False, training_mode='episode_based', path=None, seed=-1):
+                 goal_conditioned=False, store_goal_ind=False, training_mode='episode_based', path=None, seed=-1):
         """
         Parameters
         ----------
@@ -85,7 +85,7 @@ class Agent(object):
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
                                       transition_tuple=transition_tuple, prioritised=self.prioritised,
                                       seed=seed, rng=self.rng,
-                                      goal_conditioned=True,
+                                      goal_conditioned=True, store_goal_ind=store_goal_ind,
                                       sampling_strategy=algo_params['her_sampling_strategy'],
                                       num_sampled_goal=4,
                                       terminal_on_achieved=algo_params['terminate_on_achieve'],

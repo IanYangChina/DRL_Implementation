@@ -103,7 +103,7 @@ class EpisodeWiseReplayBuffer(object):
 
 
 class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple,
+    def __init__(self, capacity, tr_namedtuple, store_goal_ind=False,
                  sampling_strategy='future', sampled_goal_num=6, terminate_on_achieve=False,
                  goal_distance_threshold=0.05,
                  seed=0):
@@ -112,6 +112,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
         self.k = sampled_goal_num
         self.terminate_on_achieve = terminate_on_achieve
         self.goal_distance_threshold = goal_distance_threshold
+        self.store_goal_ind = store_goal_ind
         EpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
     def modify_episodes(self):
@@ -139,7 +140,10 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                             d = 0 if r == 0.0 else 1
                         else:
                             d = ep[tr].done
-                        modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+                        if not self.store_goal_ind:
+                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+                        else:
+                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d, ep[tr].goal_ind))
                     self.episodes.append(modified_ep)
         else:
             for _ in range(len(self.episodes)):
@@ -162,7 +166,12 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                             d = 0 if r == 0.0 else 1
                         else:
                             d = ep[tr_ind].done
-                        modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+
+                        if not self.store_goal_ind:
+                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
+                        else:
+                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d, ep[tr_ind].goal_ind))
+
                     self.episodes.append(modified_ep)
 
     def sample_achieved_goal(self, ep):
@@ -375,7 +384,7 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
 
 
 class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8,
+    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, store_goal_ind=False,
                  sampling_strategy='future', sampled_goal_num=4, terminate_on_achieve=False,
                  goal_distance_threshold=0.05,
                  rng=None):
@@ -458,7 +467,7 @@ def goal_distance_reward(goal_a, goal_b, distance_threshold=0.05):
 
 def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, rng=None,
                 # the last 4 args are only for goal-conditioned RL buffers
-                goal_conditioned=False, sampling_strategy='future', num_sampled_goal=4, terminal_on_achieved=True,
+                goal_conditioned=False, store_goal_ind=False, sampling_strategy='future', num_sampled_goal=4, terminal_on_achieved=True,
                 goal_distance_threshold=0.05):
     t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
     t_goal = namedtuple("transition",
@@ -476,6 +485,7 @@ def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, 
             transition_tuple = t_goal
         if not prioritised:
             buffer = HindsightReplayBuffer(mem_capacity, transition_tuple,
+                                           store_goal_ind=store_goal_ind,
                                            sampling_strategy=sampling_strategy,
                                            sampled_goal_num=num_sampled_goal,
                                            terminate_on_achieve=terminal_on_achieved,
@@ -484,6 +494,7 @@ def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, 
         else:
             buffer = PrioritisedHindsightReplayBuffer(mem_capacity,
                                                       transition_tuple,
+                                                      store_goal_ind=store_goal_ind,
                                                       sampling_strategy=sampling_strategy,
                                                       sampled_goal_num=num_sampled_goal,
                                                       terminate_on_achieve=terminal_on_achieved,
