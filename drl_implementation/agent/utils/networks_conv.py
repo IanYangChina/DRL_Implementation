@@ -78,7 +78,7 @@ class StochasticConvActor(nn.Module):
     def get_action(self, obs, goal=None, epsilon=1e-6, mean_pi=False, probs=False, entropy=False):
         mean, log_std = self(obs, goal)
         if mean_pi:
-            return mean
+            return T.tanh(mean)
         std = log_std.exp()
         mu = Normal(mean, std)
         z = mu.rsample()

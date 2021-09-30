@@ -53,7 +53,7 @@ class StochasticActor(nn.Module):
     def get_action(self, inputs, std_scale=None, epsilon=1e-6, mean_pi=False, probs=False, entropy=False):
         mean, log_std = self(inputs)
         if mean_pi:
-            return mean
+            return T.tanh(mean)
         std = log_std.exp()
         if std_scale is not None:
             std *= std_scale
