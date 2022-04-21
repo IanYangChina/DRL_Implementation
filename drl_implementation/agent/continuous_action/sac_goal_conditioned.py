@@ -182,13 +182,16 @@ class GoalConditionedSAC(Agent):
             actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
             actor_inputs = self.normalizer(actor_inputs)
             actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
-            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            actions_np = np.array(batch.action)
+            actions = T.as_tensor(actions_np, dtype=T.float32, device=self.device)
             critic_inputs = T.cat((actor_inputs, actions), dim=1)
             actor_inputs_ = np.concatenate((batch.next_state, batch.desired_goal), axis=1)
             actor_inputs_ = self.normalizer(actor_inputs_)
             actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
-            rewards = T.as_tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
-            done = T.as_tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
+            rewards_np = np.array(batch.reward)
+            rewards = T.as_tensor(rewards_np, dtype=T.float32, device=self.device).unsqueeze(1)
+            done_np = np.array(batch.done)
+            done = T.as_tensor(done_np, dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1

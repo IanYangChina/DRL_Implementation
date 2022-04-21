@@ -82,6 +82,11 @@ class Agent(object):
             else:
                 self.goal_dim = algo_params['goal_dim']
             self.hindsight = algo_params['hindsight']
+            try:
+                goal_distance_threshold = self.env.env.distance_threshold
+            except:
+                goal_distance_threshold = self.env.distance_threshold
+
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
                                       transition_tuple=transition_tuple, prioritised=self.prioritised,
                                       seed=seed, rng=self.rng,
@@ -89,7 +94,7 @@ class Agent(object):
                                       sampling_strategy=algo_params['her_sampling_strategy'],
                                       num_sampled_goal=4,
                                       terminal_on_achieved=algo_params['terminate_on_achieve'],
-                                      goal_distance_threshold=self.env.env.distance_threshold)
+                                      goal_distance_threshold=goal_distance_threshold)
         else:
             self.goal_dim = 0
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],

@@ -30,7 +30,7 @@ class Normalizer(object):
         if len(self.history) == 0:
             return
         new_sample_num = len(self.history)
-        new_history = np.array(self.history, dtype=np.float)
+        new_history = np.array(self.history, dtype=float)
         new_mean = np.mean(new_history, axis=0)
 
         new_var = np.sum(np.square(new_history - new_mean), axis=0)
