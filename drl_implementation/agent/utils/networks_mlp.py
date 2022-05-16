@@ -104,3 +104,7 @@ class Critic(nn.Module):
             return value
         else:
             return F.softmax(value, dim=1)
+
+    def get_action(self, inputs):
+        values = self.forward(inputs)
+        return T.argmax(values).item()
