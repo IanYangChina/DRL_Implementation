@@ -2,6 +2,7 @@ import os
 import torch as T
 import numpy as np
 import json
+from torch.utils.tensorboard import SummaryWriter
 from .utils.plot import smoothed_plot
 from .utils.replay_buffer import make_buffer
 from .utils.normalizer import Normalizer
@@ -17,7 +18,8 @@ class Agent(object):
                  algo_params,
                  transition_tuple=None,
                  image_obs=False, action_type='continuous',
-                 goal_conditioned=False, store_goal_ind=False, training_mode='episode_based', path=None, seed=-1):
+                 goal_conditioned=False, store_goal_ind=False, training_mode='episode_based',
+                 path=None, log_dir_suffix=None, seed=-1):
         """
         Parameters
         ----------
@@ -56,6 +58,11 @@ class Agent(object):
         self.data_path = os.path.join(path, 'data')
         # create directories if not exist
         mkdir([self.path, self.ckpt_path, self.data_path])
+        if log_dir_suffix is not None:
+            comment = '-'+log_dir_suffix
+        else:
+            comment = ''
+        self.logger = SummaryWriter(log_dir=self.data_path, comment=comment)
 
         # non-goal-conditioned args
         self.image_obs = image_obs
