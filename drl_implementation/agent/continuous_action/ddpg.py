@@ -141,14 +141,14 @@ class DDPG(Agent):
                 weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
-            actor_inputs = self.normalizer(batch.state)
+            actor_inputs = np.array(self.normalizer(batch.state))
             actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
-            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            actions = T.as_tensor(np.array(batch.action), dtype=T.float32, device=self.device)
             critic_inputs = T.cat((actor_inputs, actions), dim=1)
-            actor_inputs_ = self.normalizer(batch.next_state)
-            actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
-            rewards = T.as_tensor(batch.reward, dtype=T.float32, device=self.device).unsqueeze(1)
-            done = T.as_tensor(batch.done, dtype=T.float32, device=self.device).unsqueeze(1)
+            actor_inputs_ = np.array(self.normalizer(batch.next_state))
+            actor_inputs_ = T.as_tensor(np.array(actor_inputs_), dtype=T.float32, device=self.device)
+            rewards = T.as_tensor(np.array(batch.reward), dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.as_tensor(np.array(batch.done), dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1

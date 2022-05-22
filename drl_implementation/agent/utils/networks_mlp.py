@@ -11,8 +11,7 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(fc1_size, fc2_size)
         self.fc3 = nn.Linear(fc2_size, fc3_size)
         self.pi = nn.Linear(fc3_size, output_dim)
-        T.nn.init.uniform_(self.pi.weight.data, -init_w, init_w)
-        T.nn.init.uniform_(self.pi.bias.data, -init_w, init_w)
+        self.apply(orthogonal_init)
         self.action_scaling = action_scaling
 
     def forward(self, inputs):
@@ -32,11 +31,8 @@ class StochasticActor(nn.Module):
         self.fc2 = nn.Linear(fc1_size, fc2_size)
         self.fc3 = nn.Linear(fc2_size, fc3_size)
         self.mean = nn.Linear(fc3_size, output_dim)
-        T.nn.init.uniform_(self.mean.weight.data, -init_w, init_w)
-        T.nn.init.uniform_(self.mean.bias.data, -init_w, init_w)
         self.log_std = nn.Linear(fc3_size, output_dim)
-        T.nn.init.uniform_(self.log_std.weight.data, -init_w, init_w)
-        T.nn.init.uniform_(self.log_std.bias.data, -init_w, init_w)
+        self.apply(orthogonal_init)
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
         self.action_scaling = action_scaling
@@ -91,8 +87,7 @@ class Critic(nn.Module):
         self.fc2 = nn.Linear(fc1_size, fc2_size)
         self.fc3 = nn.Linear(fc2_size, fc3_size)
         self.v = nn.Linear(fc3_size, output_dim)
-        T.nn.init.uniform_(self.v.weight.data, -init_w, init_w)
-        T.nn.init.uniform_(self.v.bias.data, -init_w, init_w)
+        self.apply(orthogonal_init)
         self.softmax = softmax
 
     def forward(self, inputs):
@@ -108,3 +103,15 @@ class Critic(nn.Module):
     def get_action(self, inputs):
         values = self.forward(inputs)
         return T.argmax(values).item()
+
+
+def orthogonal_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight.data)
+        if hasattr(m.bias, 'data'):
+            m.bias.data.fill_(0.0)
+    elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+        gain = nn.init.calculate_gain('relu')
+        nn.init.orthogonal_(m.weight.data, gain)
+        if hasattr(m.bias, 'data'):
+            m.bias.data.fill_(0.0)
