@@ -44,8 +44,8 @@ class LinearDecayGreedy(object):
             count -= self.decay_start
             if count < 0:
                 count = 0
-            if count > self.decay:
-                count = self.dacay
+        if count > self.decay:
+            count = self.decay
         epsilon = self.start - count * (self.start - self.end) / self.decay
         prob = self.rng.uniform(0, 1)
         if prob < epsilon:
@@ -137,7 +137,7 @@ class AutoAdjustingEGreedyGaussian(object):
         self.action_max = action_max
         self.mu = mu
         self.base_sigma = sigma
-        self.sigma = np.ones(self.goal_num) * sigma
+        self.sigma = np.ones(goal_num) * sigma
 
         self.base_chance = chance
         self.goal_num = goal_num
