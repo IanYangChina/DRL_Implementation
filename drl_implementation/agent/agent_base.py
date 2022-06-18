@@ -15,7 +15,7 @@ def mkdir(paths):
 
 class Agent(object):
     def __init__(self,
-                 algo_params,
+                 algo_params, create_logger=False,
                  transition_tuple=None,
                  image_obs=False, action_type='continuous',
                  goal_conditioned=False, store_goal_ind=False, training_mode='episode_based',
@@ -62,7 +62,9 @@ class Agent(object):
             comment = '-'+log_dir_suffix
         else:
             comment = ''
-        self.logger = SummaryWriter(log_dir=self.data_path, comment=comment)
+        self.create_logger = create_logger
+        if self.create_logger:
+            self.logger = SummaryWriter(log_dir=self.data_path, comment=comment)
 
         # non-goal-conditioned args
         self.image_obs = image_obs
