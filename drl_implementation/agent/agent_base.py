@@ -189,7 +189,7 @@ class Agent(object):
             T.save(self.network_dict[key].state_dict(), self.ckpt_path+'/ckpt_'+key+ep+step+'.pt')
 
     def _load_network(self, keys=None, ep=None, step=None):
-        if not self.image_obs:
+        if (not self.image_obs) and self.observation_normalization:
             self.normalizer.history_mean = np.load(os.path.join(self.data_path, 'input_means.npy'))
             self.normalizer.history_var = np.load(os.path.join(self.data_path, 'input_vars.npy'))
         if ep is None:
@@ -207,7 +207,7 @@ class Agent(object):
             self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+step+'.pt', map_location=self.device))
 
     def _save_statistics(self, keys=None):
-        if not self.image_obs:
+        if (not self.image_obs) and self.observation_normalization:
             np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
             np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
         if keys is None:
