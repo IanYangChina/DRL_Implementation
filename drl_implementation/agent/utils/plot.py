@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from copy import deepcopy as dcp
 
 
@@ -50,11 +51,16 @@ def smoothed_plot_multi_line(file, data,
     plt.close()
 
 
-def smoothed_plot_mean_deviation(file, data_dict_list, legend=None, legend_loc="upper right", title=None,
-                                 x_label='Timesteps', y_label="Success rate", window=5):
+def smoothed_plot_mean_deviation(file, data_dict_list, title=None,
+                                 x_label='Timesteps', y_label="Success rate", window=5, ylim=(None, None),
+                                 legend=None, legend_loc="upper right",
+                                 legend_title=None, legend_bbox_to_anchor=None, legend_ncol=4, legend_frame=False,
+                                 handlelength=2):
     colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
     plt.ylabel(y_label)
     plt.xlabel(x_label)
+    if ylim[0] is not None:
+        plt.ylim(ylim)
     if title is not None:
         plt.title(title)
     if not isinstance(data_dict_list, list):
@@ -77,8 +83,11 @@ def smoothed_plot_mean_deviation(file, data_dict_list, legend=None, legend_loc="
         plt.fill_between(x, case_data["upper"], case_data["lower"], alpha=0.3, color=colors[i], label='_nolegend_')
         plt.plot(x, case_data["mean"], color=colors[i])
 
+    handles = [Line2D([0], [0], color=colors[i]) for i in range(len(data_dict_list))]
     if legend is not None:
-        plt.legend(legend, loc=legend_loc)
+        plt.legend(handles, legend, handlelength=handlelength,
+                   title=legend_title, loc=legend_loc, labelspacing=0.15,
+                   bbox_to_anchor=legend_bbox_to_anchor, ncol=legend_ncol, frameon=legend_frame)
     plt.savefig(file, bbox_inches='tight', dpi=500)
     plt.close()
 
