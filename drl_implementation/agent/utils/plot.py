@@ -52,22 +52,33 @@ def smoothed_plot_multi_line(file, data,
 
 
 def smoothed_plot_mean_deviation(file, data_dict_list, title=None,
-                                 x_label='Timesteps', y_label="Success rate", window=5, ylim=(None, None),
+                                 x_label='Timesteps', x_axis_off=False,
+                                 y_label="Success rate", window=5, ylim=(None, None), y_axis_off=False,
                                  legend=None, legend_loc="upper right",
                                  legend_title=None, legend_bbox_to_anchor=None, legend_ncol=4, legend_frame=False,
                                  handlelength=2):
     colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
-    plt.ylabel(y_label)
-    plt.xlabel(x_label)
+    if not isinstance(data_dict_list, list):
+        data_dict_list = [data_dict_list]
+
+    if y_axis_off:
+        plt.ylabel(None)
+        plt.yticks([])
+    else:
+        plt.ylabel(y_label)
     if ylim[0] is not None:
         plt.ylim(ylim)
     if title is not None:
         plt.title(title)
-    if not isinstance(data_dict_list, list):
-        data_dict_list = [data_dict_list]
-    if x_label == "Epoch":
-        x_tick_interval = len(data_dict_list[0]["mean"]) // 10
-        plt.xticks([n * x_tick_interval for n in range(11)])
+
+    if x_axis_off:
+        plt.xlabel(None)
+        plt.xticks([])
+    else:
+        plt.xlabel(x_label)
+        if x_label == "Epoch":
+            x_tick_interval = len(data_dict_list[0]["mean"]) // 10
+            plt.xticks([n * x_tick_interval for n in range(11)])
 
     N = len(data_dict_list[0]["mean"])
     x = [i for i in range(N)]
