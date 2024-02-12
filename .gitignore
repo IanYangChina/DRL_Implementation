@@ -4,3 +4,5 @@ __pycache__/
 drl_implementation/agent/__pycache__/
 drl_implementation/agent/utils/__pycache__/
 exp_multi_goal/__pycache__/
+build/
+drl_implementation.egg-info/

@@ -59,7 +59,8 @@ def smoothed_plot_mean_deviation(file, data_dict_list, title=None,
                                  legend=None, legend_only=False, legend_file=None, legend_loc="upper right",
                                  legend_title=None, legend_bbox_to_anchor=None, legend_ncol=4, legend_frame=False,
                                  handlelength=2):
-    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
+              'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan','k']
     if not isinstance(data_dict_list, list):
         data_dict_list = [data_dict_list]
 
