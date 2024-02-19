@@ -54,8 +54,8 @@ def smoothed_plot_multi_line(file, data,
 
 def smoothed_plot_mean_deviation(file, data_dict_list, title=None,
                                  vertical_lines=None, horizontal_lines=None, linestyle='--', linewidth=4,
-                                 x_label='Timesteps', x_axis_off=False,
-                                 y_label="Success rate", window=5, ylim=(None, None), y_axis_off=False,
+                                 x_label='Timesteps', x_axis_off=False, xticks=None,
+                                 y_label="Success rate", window=5, ylim=(None, None), y_axis_off=False, yticks=None,
                                  legend=None, legend_only=False, legend_file=None, legend_loc="upper right",
                                  legend_title=None, legend_bbox_to_anchor=None, legend_ncol=4, legend_frame=False,
                                  handlelength=2):
@@ -69,6 +69,8 @@ def smoothed_plot_mean_deviation(file, data_dict_list, title=None,
         plt.yticks([])
     else:
         plt.ylabel(y_label)
+        if yticks is not None:
+            plt.yticks(yticks)
     if ylim[0] is not None:
         plt.ylim(ylim)
     if title is not None:
@@ -82,6 +84,8 @@ def smoothed_plot_mean_deviation(file, data_dict_list, title=None,
         if x_label == "Epoch":
             x_tick_interval = len(data_dict_list[0]["mean"]) // 10
             plt.xticks([n * x_tick_interval for n in range(11)])
+        if xticks is not None:
+            plt.xticks(xticks)
 
     handles = [Line2D([0], [0], color=colors[i], linewidth=linewidth) for i in range(len(data_dict_list))]
     if legend is not None:
