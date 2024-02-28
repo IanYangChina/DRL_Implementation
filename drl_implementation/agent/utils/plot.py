@@ -24,14 +24,32 @@ def smoothed_plot(file, data, x_label="Timesteps", y_label="Success rate", windo
     plt.close()
 
 
-def smoothed_plot_multi_line(file, data,
-                             legend=None, legend_loc="upper right",
-                             x_label='Timesteps', y_label="Success rate", window=5):
-    plt.ylabel(y_label)
-    plt.xlabel(x_label)
-    if x_label == "Epoch":
-        x_tick_interval = len(data[0]) // 10
-        plt.xticks([n * x_tick_interval for n in range(11)])
+def smoothed_plot_multi_line(file, data, colors=None,
+                             legend=None, legend_loc="upper right", window=5, title=None,
+                             x_label='Timesteps', x_axis_off=False, xticks=None,
+                             y_label="Success rate", ylim=(None, None), y_axis_off=False, yticks=None):
+    if y_axis_off:
+        plt.ylabel(None)
+        plt.yticks([])
+    else:
+        plt.ylabel(y_label)
+        if yticks is not None:
+            plt.yticks(yticks)
+    if ylim[0] is not None:
+        plt.ylim(ylim)
+    if title is not None:
+        plt.title(title)
+
+    if x_axis_off:
+        plt.xlabel(None)
+        plt.xticks([])
+    else:
+        plt.xlabel(x_label)
+        if x_label == "Epoch":
+            x_tick_interval = len(data_dict_list[0]["mean"]) // 10
+            plt.xticks([n * x_tick_interval for n in range(11)])
+        if xticks is not None:
+            plt.xticks(xticks)
 
     for t in range(len(data)):
         N = len(data[t])
@@ -43,11 +61,15 @@ def smoothed_plot_multi_line(file, data,
         else:
             running_avg = data[t]
 
-        plt.plot(x, running_avg)
+        if colors is None:
+            plt.plot(x, running_avg)
+        else:
+            assert len(colors) == len(data)
+            plt.plot(x, running_avg, c=colors[t])
 
-    if legend is None:
-        legend = [str(n) for n in range(len(data))]
-    plt.legend(legend, loc=legend_loc)
+    if legend is not None:
+        plt.legend(legend, loc=legend_loc)
+
     plt.savefig(file, bbox_inches='tight', dpi=500)
     plt.close()
 
