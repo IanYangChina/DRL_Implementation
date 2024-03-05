@@ -24,17 +24,17 @@ def smoothed_plot(file, data, x_label="Timesteps", y_label="Success rate", windo
     plt.close()
 
 
-def smoothed_plot_multi_line(file, data, colors=None,
+def smoothed_plot_multi_line(file, data, colors=None, linestyles=None, linewidths=None, alphas=None,
                              legend=None, legend_loc="upper right", window=5, title=None,
-                             x_label='Timesteps', x_axis_off=False, xticks=None,
-                             y_label="Success rate", ylim=(None, None), y_axis_off=False, yticks=None):
+                             x_label='Timesteps', x_axis_off=False, xticks=None, xticklabels=None,
+                             y_label="Success rate", ylim=(None, None), y_axis_off=False, yticks=None, yticklabels=None):
     if y_axis_off:
         plt.ylabel(None)
         plt.yticks([])
     else:
         plt.ylabel(y_label)
         if yticks is not None:
-            plt.yticks(yticks)
+            plt.yticks(yticks, yticklabels)
     if ylim[0] is not None:
         plt.ylim(ylim)
     if title is not None:
@@ -49,7 +49,7 @@ def smoothed_plot_multi_line(file, data, colors=None,
             x_tick_interval = len(data_dict_list[0]["mean"]) // 10
             plt.xticks([n * x_tick_interval for n in range(11)])
         if xticks is not None:
-            plt.xticks(xticks)
+            plt.xticks(xticks, xticklabels)
 
     for t in range(len(data)):
         N = len(data[t])
@@ -62,10 +62,30 @@ def smoothed_plot_multi_line(file, data, colors=None,
             running_avg = data[t]
 
         if colors is None:
-            plt.plot(x, running_avg)
+            c = None
         else:
             assert len(colors) == len(data)
-            plt.plot(x, running_avg, c=colors[t])
+            c = colors[t]
+
+        if linestyles is None:
+            ls = '-'
+        else:
+            assert len(linestyles) == len(data)
+            ls = linestyles[t]
+
+        if linewidths is None:
+            linewidth = 1
+        else:
+            assert len(linewidths) == len(data)
+            linewidth = linewidths[t]
+
+        if alphas is None:
+            alpha = 1
+        else:
+            assert len(alphas) == len(data)
+            alpha = alphas[t]
+
+        plt.plot(x, running_avg, c=c, linestyle=ls, linewidth=linewidth, alpha=alpha)
 
     if legend is not None:
         plt.legend(legend, loc=legend_loc)
