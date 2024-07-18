@@ -1,7 +1,7 @@
 import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal
+from torch.distributions import Normal, Categorical
 
 
 class Actor(nn.Module):
@@ -23,15 +23,19 @@ class Actor(nn.Module):
 
 
 class StochasticActor(nn.Module):
-    def __init__(self, input_dim, output_dim, log_std_min, log_std_max,
+    def __init__(self, input_dim, output_dim, log_std_min, log_std_max, continuous=True,
                  fc1_size=256, fc2_size=256, fc3_size=256, init_w=3e-3, action_scaling=1):
         super(StochasticActor, self).__init__()
+        self.continuous = continuous
         self.action_dim = output_dim
         self.fc1 = nn.Linear(input_dim, fc1_size)
         self.fc2 = nn.Linear(fc1_size, fc2_size)
-        self.fc3 = nn.Linear(fc2_size, fc3_size)
-        self.mean = nn.Linear(fc3_size, output_dim)
-        self.log_std = nn.Linear(fc3_size, output_dim)
+        if self.continuous:
+            self.fc3 = nn.Linear(fc2_size, fc3_size)
+            self.mean = nn.Linear(fc3_size, output_dim)
+            self.log_std = nn.Linear(fc3_size, output_dim)
+        else:
+            self.fc3 = nn.Linear(fc2_size, output_dim)
         self.apply(orthogonal_init)
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
@@ -41,32 +45,47 @@ class StochasticActor(nn.Module):
         x = F.relu(self.fc1(inputs))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
-        mean = self.mean(x)
-        log_std = self.log_std(x)
-        log_std = T.clamp(log_std, self.log_std_min, self.log_std_max)
-        return mean, log_std
-    
-    def get_action(self, inputs, std_scale=None, epsilon=1e-6, mean_pi=False, probs=False, entropy=False):
-        mean, log_std = self(inputs)
-        if mean_pi:
-            return T.tanh(mean)
-        std = log_std.exp()
-        if std_scale is not None:
-            std *= std_scale
-        mu = Normal(mean, std)
-        z = mu.rsample()
-        action = T.tanh(z)
-        if not probs:
-            return action * self.action_scaling
+        if self.continuous:
+            mean = self.mean(x)
+            log_std = self.log_std(x)
+            log_std = T.clamp(log_std, self.log_std_min, self.log_std_max)
+            return mean, log_std
         else:
-            if action.shape == (self.action_dim,):
-                action = action.reshape((1, self.action_dim))
-            log_probs = (mu.log_prob(z) - T.log(1 - action.pow(2) + epsilon)).sum(1, keepdim=True)
-            if not entropy:
-                return action * self.action_scaling, log_probs
+            return x
+    
+    def get_action(self, inputs, std_scale=None, epsilon=1e-6, mean_pi=False, greedy=False, probs=False, entropy=False):
+        if self.continuous:
+            mean, log_std = self(inputs)
+            if mean_pi:
+                return T.tanh(mean)
+            std = log_std.exp()
+            if std_scale is not None:
+                std *= std_scale
+            mu = Normal(mean, std)
+            z = mu.rsample()
+            action = T.tanh(z)
+            if not probs:
+                return action * self.action_scaling
             else:
-                entropy = mu.entropy()
-                return action * self.action_scaling, log_probs, entropy
+                if action.shape == (self.action_dim,):
+                    action = action.reshape((1, self.action_dim))
+                log_probs = (mu.log_prob(z) - T.log(1 - action.pow(2) + epsilon)).sum(1, keepdim=True)
+                if not entropy:
+                    return action * self.action_scaling, log_probs
+                else:
+                    entropy = mu.entropy()
+                    return action * self.action_scaling, log_probs, entropy
+        else:
+            logits = self(inputs)
+            if greedy:
+                actions = T.argmax(logits, dim=1, keepdim=True)
+                return actions
+            action_probs = F.softmax(logits, dim=1)
+            dist = Categorical(action_probs)
+            actions = dist.sample().view(-1, 1)
+            log_probs = T.log(action_probs + epsilon)
+            entropy = dist.entropy()
+            return actions, log_probs, entropy
 
     def get_log_probs(self, inputs, actions, std_scale=None):
         actions /= self.action_scaling

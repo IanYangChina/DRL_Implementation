@@ -103,7 +103,8 @@ class EpisodeWiseReplayBuffer(object):
 
 
 class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, store_goal_ind=False,
+    def __init__(self, capacity, tr_namedtuple, reward_func=None,
+                 store_goal_ind=False,
                  sampling_strategy='future', sampled_goal_num=6, terminate_on_achieve=False,
                  goal_distance_threshold=0.05,
                  seed=0):
@@ -112,6 +113,9 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
         self.k = sampled_goal_num
         self.terminate_on_achieve = terminate_on_achieve
         self.goal_distance_threshold = goal_distance_threshold
+        self.reward_func = reward_func
+        if self.reward_func is None:
+            self.reward_func = goal_distance_reward
         self.store_goal_ind = store_goal_ind
         EpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
 
@@ -135,7 +139,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         a = ep[tr].action
                         ns = ep[tr].next_state
                         ag = ep[tr].achieved_goal
-                        r = goal_distance_reward(dg, ag, self.goal_distance_threshold)
+                        r = self.reward_func(dg, ag, self.goal_distance_threshold)
                         if self.terminate_on_achieve:
                             d = 0 if r == 0.0 else 1
                         else:
@@ -161,7 +165,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         a = ep[tr_ind].action
                         ns = ep[tr_ind].next_state
                         ag = ep[tr_ind].achieved_goal
-                        r = goal_distance_reward(dg, ag, self.goal_distance_threshold)
+                        r = self.reward_func(dg, ag, self.goal_distance_threshold)
                         if self.terminate_on_achieve:
                             d = 0 if r == 0.0 else 1
                         else:
@@ -386,13 +390,16 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
 class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, store_goal_ind=False,
                  sampling_strategy='future', sampled_goal_num=4, terminate_on_achieve=False,
-                 goal_distance_threshold=0.05,
+                 goal_distance_threshold=0.05, reward_func=None,
                  rng=None):
         self.sampling_strategy = sampling_strategy
         assert self.sampling_strategy in ['final', 'episode', 'future']
         self.k = sampled_goal_num
         self.terminate_on_achieve = terminate_on_achieve
         self.goal_distance_threshold = goal_distance_threshold
+        self.reward_func = reward_func
+        if self.reward_func is None:
+            self.reward_func = goal_distance_reward
         PrioritisedEpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, alpha=alpha, beta=beta, rng=rng)
 
     def modify_episodes(self):
@@ -415,7 +422,7 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                         a = ep[tr].action
                         ns = ep[tr].next_state
                         ag = ep[tr].achieved_goal
-                        r = goal_distance_reward(dg, ag, self.goal_distance_threshold)
+                        r = self.reward_func(dg, ag, self.goal_distance_threshold)
                         if self.terminate_on_achieve:
                             d = 0 if r == 0.0 else 1
                         else:
@@ -438,7 +445,7 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                         a = ep[tr_ind].action
                         ns = ep[tr_ind].next_state
                         ag = ep[tr_ind].achieved_goal
-                        r = goal_distance_reward(dg, ag, self.goal_distance_threshold)
+                        r = self.reward_func(dg, ag, self.goal_distance_threshold)
                         if self.terminate_on_achieve:
                             d = 0 if r == 0.0 else 1
                         else:
@@ -468,7 +475,7 @@ def goal_distance_reward(goal_a, goal_b, distance_threshold=0.05):
 def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, rng=None,
                 # the last 4 args are only for goal-conditioned RL buffers
                 goal_conditioned=False, store_goal_ind=False, sampling_strategy='future', num_sampled_goal=4, terminal_on_achieved=True,
-                goal_distance_threshold=0.05):
+                goal_distance_threshold=0.05, goal_conditioned_reward_func=None):
     t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
     t_goal = namedtuple("transition",
                         ('state', 'desired_goal', 'action', 'next_state', 'achieved_goal', 'reward', 'done'))
@@ -483,6 +490,8 @@ def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, 
     else:
         if transition_tuple is None:
             transition_tuple = t_goal
+        if goal_conditioned_reward_func is None:
+            print("No reward function is provided for goal-conditioned RL, using default L2-distance reward function")
         if not prioritised:
             buffer = HindsightReplayBuffer(mem_capacity, transition_tuple,
                                            store_goal_ind=store_goal_ind,
@@ -490,7 +499,8 @@ def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, 
                                            sampled_goal_num=num_sampled_goal,
                                            terminate_on_achieve=terminal_on_achieved,
                                            seed=seed,
-                                           goal_distance_threshold=goal_distance_threshold)
+                                           goal_distance_threshold=goal_distance_threshold,
+                                           reward_func=goal_conditioned_reward_func)
         else:
             buffer = PrioritisedHindsightReplayBuffer(mem_capacity,
                                                       transition_tuple,
@@ -498,5 +508,6 @@ def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, 
                                                       sampling_strategy=sampling_strategy,
                                                       sampled_goal_num=num_sampled_goal,
                                                       terminate_on_achieve=terminal_on_achieved,
-                                                      rng=rng)
+                                                      rng=rng,
+                                                      reward_func=goal_conditioned_reward_func)
     return buffer

@@ -17,7 +17,7 @@ class Agent(object):
     def __init__(self,
                  algo_params, create_logger=False,
                  transition_tuple=None,
-                 image_obs=False, action_type='continuous',
+                 non_flat_obs=False, action_type='continuous',
                  goal_conditioned=False, store_goal_ind=False, training_mode='episode_based',
                  path=None, log_dir_suffix=None, seed=-1):
         """
@@ -27,8 +27,8 @@ class Agent(object):
             a dictionary of parameters
         transition_tuple : collections.namedtuple
             a python namedtuple for storing, managing and sampling experiences, see .utils.replay_buffer
-        image_obs : bool
-            whether the observations are images
+        non_flat_obs : bool
+            whether the observations are 1D or nD
         action_type : str
             either 'discrete' or 'continuous'
         goal_conditioned : bool
@@ -67,9 +67,9 @@ class Agent(object):
             self.logger = SummaryWriter(log_dir=self.data_path, comment=comment)
 
         # non-goal-conditioned args
-        self.image_obs = image_obs
+        self.non_flat_obs = non_flat_obs
         self.action_type = action_type
-        if self.image_obs:
+        if self.non_flat_obs:
             self.state_dim = 0
             self.state_shape = algo_params['state_shape']
         else:
@@ -78,6 +78,11 @@ class Agent(object):
         if self.action_type == 'continuous':
             self.action_max = algo_params['action_max']
             self.action_scaling = algo_params['action_scaling']
+        if self.action_type == 'hybrid':
+            self.discrete_action_dim = algo_params['discrete_action_dim']
+            self.continuous_action_dim = algo_params['continuous_action_dim']
+            self.continuous_action_max = algo_params['continuous_action_max']
+            self.continuous_action_scaling = algo_params['continuous_action_scaling']
 
         # goal-conditioned args & buffers
         self.goal_conditioned = goal_conditioned
@@ -85,7 +90,7 @@ class Agent(object):
         self.prioritised = algo_params['prioritised']
 
         if self.goal_conditioned:
-            if self.image_obs:
+            if self.non_flat_obs:
                 self.goal_dim = 0
                 self.goal_shape = algo_params['goal_shape']
             else:
@@ -96,6 +101,14 @@ class Agent(object):
             except:
                 goal_distance_threshold = self.env.distance_threshold
 
+            goal_conditioned_reward_func = None
+            try:
+                if self.env.env.goal_conditioned_reward_function is not None:
+                    goal_conditioned_reward_func = self.env.env.goal_conditioned_reward_function
+            except:
+                if self.env.goal_conditioned_reward_function is not None:
+                    goal_conditioned_reward_func = self.env.goal_conditioned_reward_function
+
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
                                       transition_tuple=transition_tuple, prioritised=self.prioritised,
                                       seed=seed, rng=self.rng,
@@ -103,7 +116,8 @@ class Agent(object):
                                       sampling_strategy=algo_params['her_sampling_strategy'],
                                       num_sampled_goal=4,
                                       terminal_on_achieved=algo_params['terminate_on_achieve'],
-                                      goal_distance_threshold=goal_distance_threshold)
+                                      goal_distance_threshold=goal_distance_threshold,
+                                      goal_conditioned_reward_func=goal_conditioned_reward_func)
         else:
             self.goal_dim = 0
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
@@ -112,7 +126,7 @@ class Agent(object):
                                       goal_conditioned=False)
 
         # common args
-        if not self.image_obs:
+        if not self.non_flat_obs:
             self.observation_normalization = algo_params['observation_normalization']
             # if not using obs normalization, the normalizer is just a scale multiplier, returns inputs*scale
             self.normalizer = Normalizer(self.state_dim+self.goal_dim,
@@ -189,7 +203,7 @@ class Agent(object):
             T.save(self.network_dict[key].state_dict(), self.ckpt_path+'/ckpt_'+key+ep+step+'.pt')
 
     def _load_network(self, keys=None, ep=None, step=None):
-        if (not self.image_obs) and self.observation_normalization:
+        if (not self.non_flat_obs) and self.observation_normalization:
             self.normalizer.history_mean = np.load(os.path.join(self.data_path, 'input_means.npy'))
             self.normalizer.history_var = np.load(os.path.join(self.data_path, 'input_vars.npy'))
         if ep is None:
@@ -207,7 +221,7 @@ class Agent(object):
             self.network_dict[key].load_state_dict(T.load(self.ckpt_path+'/ckpt_'+key+ep+step+'.pt', map_location=self.device))
 
     def _save_statistics(self, keys=None):
-        if (not self.image_obs) and self.observation_normalization:
+        if (not self.non_flat_obs) and self.observation_normalization:
             np.save(os.path.join(self.data_path, 'input_means'), self.normalizer.history_mean)
             np.save(os.path.join(self.data_path, 'input_vars'), self.normalizer.history_var)
         if keys is None:
