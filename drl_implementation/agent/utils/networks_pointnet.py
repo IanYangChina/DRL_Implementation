@@ -5,11 +5,15 @@ from pointnet_utils import PointNetEncoder, feature_transform_reguliarzer
 
 
 class CriticPointNet(nn.Module):
-    def __init__(self, output_dim, normal_channel=False, softmax=False):
+    def __init__(self, output_dim, action_dim, normal_channel=False, softmax=False, goal_conditioned=False):
         super(CriticPointNet, self).__init__()
         in_channel = 6 if normal_channel else 3
         self.feat = PointNetEncoder(global_feat=True, feature_transform=True, channel=in_channel)
-        self.fc1 = nn.Linear(2048, 512)
+        self.goal_conditioned = goal_conditioned
+        if self.goal_conditioned:
+            self.fc1 = nn.Linear(2048+action_dim, 512)
+        else:
+            self.fc1 = nn.Linear(1024+action_dim, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, output_dim)
         self.dropout = nn.Dropout(p=0.4)
@@ -17,10 +21,12 @@ class CriticPointNet(nn.Module):
         self.bn2 = nn.BatchNorm1d(256)
         self.softmax = softmax
 
-    def forward(self, obs_xyz, goal_xyz):
-        obs_x, obs_trans, obs_trans_feat = self.feat(obs_xyz)
-        goal_x, goal_trans, goal_trans_feat = self.feat(goal_xyz)
-        x = T.cat([obs_x, goal_x.detach()], dim=1)
+    def forward(self, obs_xyz, action, goal_xyz=None):
+        x, trans, trans_feat = self.feat(obs_xyz)
+        if self.goal_conditioned and goal_xyz is not None:
+            goal_x, goal_trans, goal_trans_feat = self.feat(goal_xyz)
+            x = T.cat([x, goal_x.detach()], dim=1)
+        x = T.cat([x, action], dim=1)
         x = F.relu(self.bn1(self.fc1(x)))
         x = F.relu(self.bn2(self.dropout(self.fc2(x))))
         value = self.fc3(x)
@@ -36,13 +42,9 @@ class CriticPointNet(nn.Module):
             x = x.detach()
         return x
 
-    def get_action(self, inputs):
-        values = self.forward(inputs)
-        return T.argmax(values).item()
-
 
 class CriticPointNet2(nn.Module):
-    def __init__(self, output_dim, normal_channel=False, softmax=False):
+    def __init__(self, output_dim, action_dim, normal_channel=False, softmax=False):
         super(CriticPointNet2, self).__init__()
         in_channel = 6 if normal_channel else 3
         self.normal_channel = normal_channel
@@ -53,7 +55,7 @@ class CriticPointNet2(nn.Module):
         self.sa3 = PointNetSetAbstraction(npoint=None, radius=None, nsample=None, in_channel=256 + 3,
                                           mlp=[256, 512, 1024], group_all=True)
 
-        self.fc1 = nn.Linear(1024, 512)
+        self.fc1 = nn.Linear(1024+action_dim, 512)
         self.bn1 = nn.BatchNorm1d(512)
         self.drop1 = nn.Dropout(0.4)
         self.fc2 = nn.Linear(512, 256)

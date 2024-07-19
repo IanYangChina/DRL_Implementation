@@ -46,7 +46,7 @@ class GoalConditionedSAC(Agent):
             'discrete_actor': StochasticActor(2048, self.discrete_action_dim, continuous=False,
                                               fc1_size=1024,
                                               log_std_min=-6, log_std_max=1).to(self.device),
-            'continuous_actor': StochasticActor(2048, self.continuous_action_dim, fc1_size=1024,
+            'continuous_actor': StochasticActor(2048+self.discrete_action_dim, self.continuous_action_dim, fc1_size=1024,
                                                 log_std_min=-6, log_std_max=1,
                                                 action_scaling=self.continuous_action_scaling).to(self.device),
             'critic_1': CriticPointNet(output_dim=1).to(self.device),
@@ -65,7 +65,8 @@ class GoalConditionedSAC(Agent):
         self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'], tau=1)
         self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'], tau=1)
-        self.target_entropy = -self.action_dim
+        self.target_discrete_entropy = -self.discrete_action_dim
+        self.target_continuous_entropy = -self.continuous_action_dim
         self.alpha_discrete_optimizer = Adam([self.network_dict['log_alpha_discrete']], lr=self.actor_learning_rate)
         self.alpha_continuous_optimizer = Adam([self.network_dict['log_alpha_continuous']], lr=self.actor_learning_rate)
         # training args
@@ -143,6 +144,8 @@ class GoalConditionedSAC(Agent):
         goal_point_features = self.network_dict['critic_1_target'].get_features(goal_points)
         inputs = T.cat((obs_point_features, goal_point_features), dim=1)
         discrete_action, _, _ = self.network_dict['discrete_actor'].get_action(inputs, greedy=test).detach().cpu().numpy()
+        discrete_action_onehot = F.one_hot(T.as_tensor(discrete_action, dtype=T.long), self.discrete_action_dim).float()
+        inputs = T.cat((inputs, discrete_action_onehot), dim=1)
         continuous_action = self.network_dict['continuous_actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
         return discrete_action, continuous_action
 
@@ -159,10 +162,14 @@ class GoalConditionedSAC(Agent):
         if steps is None:
             steps = self.optimizer_steps
 
-        critic_losses = T.zeros(1, device=self.device)
-        actor_losses = T.zeros(1, device=self.device)
-        alphas = T.zeros(1, device=self.device)
-        policy_entropies = T.zeros(1, device=self.device)
+        avg_critic_1_loss = T.zeros(1, device=self.device)
+        avg_critic_2_loss = T.zeros(1, device=self.device)
+        avg_discrete_actor_loss = T.zeros(1, device=self.device)
+        avg_discrete_alpha = T.zeros(1, device=self.device)
+        avg_discrete_policy_entropy = T.zeros(1, device=self.device)
+        avg_continuous_actor_loss = T.zeros(1, device=self.device)
+        avg_continuous_alpha = T.zeros(1, device=self.device)
+        avg_continuous_policy_entropy = T.zeros(1, device=self.device)
         for i in range(steps):
             if self.prioritised:
                 batch, weights, inds = self.buffer.sample(self.batch_size)
@@ -172,34 +179,40 @@ class GoalConditionedSAC(Agent):
                 weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
-            actor_inputs = np.concatenate((batch.state, batch.desired_goal), axis=1)
-            actor_inputs = self.normalizer(actor_inputs)
-            actor_inputs = T.as_tensor(actor_inputs, dtype=T.float32, device=self.device)
-            actions_np = np.array(batch.action)
-            actions = T.as_tensor(actions_np, dtype=T.float32, device=self.device)
-            critic_inputs = T.cat((actor_inputs, actions), dim=1)
-            actor_inputs_ = np.concatenate((batch.next_state, batch.desired_goal), axis=1)
-            actor_inputs_ = self.normalizer(actor_inputs_)
-            actor_inputs_ = T.as_tensor(actor_inputs_, dtype=T.float32, device=self.device)
-            rewards_np = np.array(batch.reward)
-            rewards = T.as_tensor(rewards_np, dtype=T.float32, device=self.device).unsqueeze(1)
-            done_np = np.array(batch.done)
-            done = T.as_tensor(done_np, dtype=T.float32, device=self.device).unsqueeze(1)
+            obs = T.as_tensor(batch.state, dtype=T.float32, device=self.device)
+            obs_features = self.network_dict['critic_1_target'].get_features(obs, detach=True)
+            goal = T.as_tensor(batch.desired_goal, dtype=T.float32, device=self.device)
+            goal_features = self.network_dict['critic_1_target'].get_features(goal, detach=True)
+            obs_ = T.as_tensor(batch.next_state, dtype=T.float32, device=self.device)
+            obs_features_ = self.network_dict['critic_1_target'].get_features(obs_, detach=True)
+            discrete_actions = T.as_tensor(batch.discrete_action, dtype=T.long, device=self.device).view(-1, 1)
+            discrete_actions_onehot = F.one_hot(discrete_actions, self.discrete_action_dim).float()
+            continuous_actions = T.as_tensor(batch.continuous_action, dtype=T.float32, device=self.device)
+            actions = T.cat((discrete_actions_onehot, continuous_actions), dim=1)
+            rewards = T.as_tensor(np.array(batch.reward), dtype=T.float32, device=self.device).unsqueeze(1)
+            done = T.as_tensor(np.array(batch.done), dtype=T.float32, device=self.device).unsqueeze(1)
 
             if self.discard_time_limit:
                 done = done * 0 + 1
 
             with T.no_grad():
-                actions_, log_probs_ = self.network_dict['actor'].get_action(actor_inputs_, probs=True)
-                critic_inputs_ = T.cat((actor_inputs_, actions_), dim=1)
-                value_1_ = self.network_dict['critic_1_target'](critic_inputs_)
-                value_2_ = self.network_dict['critic_2_target'](critic_inputs_)
-                value_ = T.min(value_1_, value_2_) - (self.network_dict['alpha'] * log_probs_)
+                actor_inputs_ = T.cat((obs_features_, goal_features), dim=1)
+                discrete_actions_, discrete_actions_log_probs_, _ = self.network_dict['discrete_actor'].get_action(actor_inputs_)
+                discrete_actions_onehot_ = F.one_hot(discrete_actions_, self.discrete_action_dim).float()
+                actor_inputs_ = T.cat((actor_inputs_, discrete_actions_onehot_), dim=1)
+                continuous_actions_, continuous_actions_log_probs_, _ = self.network_dict['continuous_actor'].get_action(actor_inputs_)
+                actions_ = T.cat((discrete_actions_onehot_, continuous_actions_), dim=1)
+
+                value_1_ = self.network_dict['critic_1_target'](obs_, actions_, goal)
+                value_2_ = self.network_dict['critic_2_target'](obs_, actions_, goal)
+                value_ = T.min(value_1_, value_2_) - \
+                         (self.network_dict['alpha_discrete'] * discrete_actions_log_probs_) - \
+                         (self.network_dict['alpha_continuous'] * continuous_actions_log_probs_)
                 value_target = rewards + done * self.gamma * value_
-                value_target = T.clamp(value_target, -self.clip_value, 0.0)
+                # value_target = T.clamp(value_target, -self.clip_value, 0.0)
 
             self.critic_1_optimizer.zero_grad()
-            value_estimate_1 = self.network_dict['critic_1'](critic_inputs)
+            value_estimate_1 = self.network_dict['critic_1'](obs, actions, goal)
             critic_loss_1 = F.mse_loss(value_estimate_1, value_target.detach(), reduction='none')
             (critic_loss_1 * weights).mean().backward()
             self.critic_1_optimizer.step()
@@ -209,41 +222,67 @@ class GoalConditionedSAC(Agent):
                 self.buffer.update_priority(inds, np.abs(critic_loss_1.cpu().detach().numpy()))
 
             self.critic_2_optimizer.zero_grad()
-            value_estimate_2 = self.network_dict['critic_2'](critic_inputs)
+            value_estimate_2 = self.network_dict['critic_2'](obs, actions, goal)
             critic_loss_2 = F.mse_loss(value_estimate_2, value_target.detach(), reduction='none')
             (critic_loss_2 * weights).mean().backward()
             self.critic_2_optimizer.step()
 
-            critic_losses += critic_loss_1.detach().mean()
+            avg_critic_1_loss += critic_loss_1.detach().mean()
+            avg_critic_2_loss += critic_loss_2.detach().mean()
 
             if self.optim_step_count % self.critic_target_update_interval == 0:
                 self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'])
                 self._soft_update(self.network_dict['critic_2'], self.network_dict['critic_2_target'])
 
             if self.optim_step_count % self.actor_update_interval == 0:
-                self.actor_optimizer.zero_grad()
-                new_actions, new_log_probs, entropy = self.network_dict['actor'].get_action(actor_inputs, probs=True,
-                                                                                            entropy=True)
-                critic_eval_inputs = T.cat((actor_inputs, new_actions), dim=1).to(self.device)
-                new_values = T.min(self.network_dict['critic_1'](critic_eval_inputs),
-                                   self.network_dict['critic_2'](critic_eval_inputs))
-                actor_loss = (self.network_dict['alpha'] * new_log_probs - new_values).mean()
-                actor_loss.backward()
-                self.actor_optimizer.step()
+                self.discrete_actor_optimizer.zero_grad()
+                self.continuous_actor_optimizer.zero_grad()
+                actor_inputs = T.cat((obs_features, goal_features), dim=1)
+                new_discrete_actions, new_discrete_action_log_probs, new_discrete_action_entropy = \
+                    self.network_dict['discrete_actor'].get_action(actor_inputs)
+                new_discrete_actions_onehot = F.one_hot(new_discrete_actions, self.discrete_action_dim).float()
+                new_continuous_actions, new_continuous_action_log_probs, new_continuous_action_entropy = \
+                    self.network_dict['continuous_actor'].get_action(T.cat((actor_inputs, new_discrete_actions_onehot), dim=1))
+                new_actions = T.cat((new_discrete_actions_onehot, new_continuous_actions), dim=1)
 
-                self.alpha_optimizer.zero_grad()
-                alpha_loss = (self.network_dict['log_alpha'] * (-new_log_probs - self.target_entropy).detach()).mean()
-                alpha_loss.backward()
-                self.alpha_optimizer.step()
-                self.network_dict['alpha'] = self.network_dict['log_alpha'].exp()
+                new_values = T.min(self.network_dict['critic_1'](obs, new_actions, goal),
+                                   self.network_dict['critic_2'](obs, new_actions, goal))
 
-                actor_losses += actor_loss.detach()
-                alphas += self.network_dict['alpha'].detach()
-                policy_entropies += entropy.detach().mean()
+                discrete_actor_loss = (self.network_dict['alpha_discrete'] * new_discrete_action_log_probs - new_values).mean()
+                discrete_actor_loss.backward()
+                self.discrete_actor_optimizer.step()
+
+                self.alpha_discrete_optimizer.zero_grad()
+                discrete_alpha_loss = (self.network_dict['log_alpha_discrete'] * (-new_discrete_action_log_probs - self.target_discrete_entropy).detach()).mean()
+                discrete_alpha_loss.backward()
+                self.alpha_discrete_optimizer.step()
+                self.network_dict['alpha_discrete'] = self.network_dict['log_alpha_discrete'].exp()
+
+                continuous_actor_loss = (self.network_dict['alpha_continuous'] * new_continuous_action_log_probs - new_values).mean()
+                continuous_actor_loss.backward()
+                self.continuous_actor_optimizer.step()
+
+                self.alpha_continuous_optimizer.zero_grad()
+                continuous_alpha_loss = (self.network_dict['log_alpha_continuous'] * (-new_continuous_action_log_probs - self.target_continuous_entropy).detach()).mean()
+                continuous_alpha_loss.backward()
+                self.alpha_continuous_optimizer.step()
+                self.network_dict['alpha_continuous'] = self.network_dict['log_alpha_continuous'].exp()
+
+                avg_discrete_actor_loss += discrete_actor_loss.detach()
+                avg_discrete_alpha += self.network_dict['alpha_discrete'].detach()
+                avg_discrete_policy_entropy += new_discrete_action_entropy.detach().mean()
+
+                avg_continuous_actor_loss += continuous_actor_loss.detach()
+                avg_continuous_alpha += self.network_dict['alpha_continuous'].detach()
+                avg_continuous_policy_entropy += new_continuous_action_entropy.detach().mean()
 
             self.optim_step_count += 1
 
-        self.statistic_dict['critic_loss'].append(critic_losses / steps)
-        self.statistic_dict['actor_loss'].append(actor_losses / steps)
-        self.statistic_dict['alpha'].append(alphas / steps)
-        self.statistic_dict['policy_entropy'].append(policy_entropies / steps)
+        self.logger.add_scalar(tag='critic_1_loss', value=avg_critic_1_loss / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='critic_2_loss', value=avg_critic_2_loss / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='discrete_actor_loss', value=avg_discrete_actor_loss / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='discrete_alpha', value=avg_discrete_alpha / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='discrete_policy_entropy', value=avg_discrete_policy_entropy / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='continuous_actor_loss', value=avg_continuous_actor_loss / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='continuous_alpha', value=avg_continuous_alpha / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='continuous_policy_entropy', value=avg_continuous_policy_entropy / steps, step=self.cur_ep)
