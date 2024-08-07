@@ -9,7 +9,7 @@ from ..agent_base import Agent
 from collections import namedtuple
 
 
-class GoalConditionedSAC(Agent):
+class GPASAC(Agent):
     def __init__(self, algo_params, env, transition_tuple=None, path=None, seed=-1):
         # environment
         self.env = env
@@ -31,22 +31,23 @@ class GoalConditionedSAC(Agent):
 
         if transition_tuple is None:
             transition_tuple = namedtuple("transition",
-                                          ('state', 'desired_goal', 'discrete_action','continuous_action',
+                                          ('state', 'desired_goal', 'discrete_action', 'continuous_action',
                                            'next_state', 'achieved_goal', 'reward', 'done'))
-        super(GoalConditionedSAC, self).__init__(algo_params,
-                                                 non_flat_obs=True,
-                                                 action_type='hybrid',
-                                                 transition_tuple=transition_tuple,
-                                                 goal_conditioned=True,
-                                                 path=path,
-                                                 seed=seed,
-                                                 create_logger=True)
+        super(GPASAC, self).__init__(algo_params,
+                                     non_flat_obs=True,
+                                     action_type='hybrid',
+                                     transition_tuple=transition_tuple,
+                                     goal_conditioned=True,
+                                     path=path,
+                                     seed=seed,
+                                     create_logger=True)
         # torch
         self.network_dict.update({
             'discrete_actor': StochasticActor(2048, self.discrete_action_dim, continuous=False,
                                               fc1_size=1024,
                                               log_std_min=-6, log_std_max=1).to(self.device),
-            'continuous_actor': StochasticActor(2048+self.discrete_action_dim, self.continuous_action_dim, fc1_size=1024,
+            'continuous_actor': StochasticActor(2048 + self.discrete_action_dim, self.continuous_action_dim,
+                                                fc1_size=1024,
                                                 log_std_min=-6, log_std_max=1,
                                                 action_scaling=self.continuous_action_scaling).to(self.device),
             'critic_1': CriticPointNet(output_dim=1).to(self.device),
@@ -59,8 +60,10 @@ class GoalConditionedSAC(Agent):
             'log_alpha_continuous': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
         self.network_keys_to_save = ['discrete_actor', 'continuous_actor', 'critic_1_target']
-        self.discrete_actor_optimizer = Adam(self.network_dict['discrete_actor'].parameters(), lr=self.actor_learning_rate)
-        self.continuous_actor_optimizer = Adam(self.network_dict['continuous_actor'].parameters(), lr=self.actor_learning_rate)
+        self.discrete_actor_optimizer = Adam(self.network_dict['discrete_actor'].parameters(),
+                                             lr=self.actor_learning_rate)
+        self.continuous_actor_optimizer = Adam(self.network_dict['continuous_actor'].parameters(),
+                                               lr=self.actor_learning_rate)
         self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate)
         self.critic_2_optimizer = Adam(self.network_dict['critic_2'].parameters(), lr=self.critic_learning_rate)
         self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_1_target'], tau=1)
@@ -70,7 +73,7 @@ class GoalConditionedSAC(Agent):
         self.alpha_discrete_optimizer = Adam([self.network_dict['log_alpha_discrete']], lr=self.actor_learning_rate)
         self.alpha_continuous_optimizer = Adam([self.network_dict['log_alpha_continuous']], lr=self.actor_learning_rate)
         # training args
-        self.clip_value = algo_params['clip_value']
+        # self.clip_value = algo_params['clip_value']
         self.actor_update_interval = algo_params['actor_update_interval']
         self.critic_target_update_interval = algo_params['critic_target_update_interval']
 
@@ -143,10 +146,12 @@ class GoalConditionedSAC(Agent):
         obs_point_features = self.network_dict['critic_1_target'].get_features(obs_points)
         goal_point_features = self.network_dict['critic_1_target'].get_features(goal_points)
         inputs = T.cat((obs_point_features, goal_point_features), dim=1)
-        discrete_action, _, _ = self.network_dict['discrete_actor'].get_action(inputs, greedy=test).detach().cpu().numpy()
+        discrete_action, _, _ = self.network_dict['discrete_actor'].get_action(inputs,
+                                                                               greedy=test).detach().cpu().numpy()
         discrete_action_onehot = F.one_hot(T.as_tensor(discrete_action, dtype=T.long), self.discrete_action_dim).float()
         inputs = T.cat((inputs, discrete_action_onehot), dim=1)
-        continuous_action = self.network_dict['continuous_actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
+        continuous_action = self.network_dict['continuous_actor'].get_action(inputs,
+                                                                             mean_pi=test).detach().cpu().numpy()
         return discrete_action, continuous_action
 
     def _preprocess_points(self, points):
@@ -197,10 +202,12 @@ class GoalConditionedSAC(Agent):
 
             with T.no_grad():
                 actor_inputs_ = T.cat((obs_features_, goal_features), dim=1)
-                discrete_actions_, discrete_actions_log_probs_, _ = self.network_dict['discrete_actor'].get_action(actor_inputs_)
+                discrete_actions_, discrete_actions_log_probs_, _ = self.network_dict['discrete_actor'].get_action(
+                    actor_inputs_)
                 discrete_actions_onehot_ = F.one_hot(discrete_actions_, self.discrete_action_dim).float()
                 actor_inputs_ = T.cat((actor_inputs_, discrete_actions_onehot_), dim=1)
-                continuous_actions_, continuous_actions_log_probs_, _ = self.network_dict['continuous_actor'].get_action(actor_inputs_)
+                continuous_actions_, continuous_actions_log_probs_, _ = self.network_dict[
+                    'continuous_actor'].get_action(actor_inputs_)
                 actions_ = T.cat((discrete_actions_onehot_, continuous_actions_), dim=1)
 
                 value_1_ = self.network_dict['critic_1_target'](obs_, actions_, goal)
@@ -242,28 +249,33 @@ class GoalConditionedSAC(Agent):
                     self.network_dict['discrete_actor'].get_action(actor_inputs)
                 new_discrete_actions_onehot = F.one_hot(new_discrete_actions, self.discrete_action_dim).float()
                 new_continuous_actions, new_continuous_action_log_probs, new_continuous_action_entropy = \
-                    self.network_dict['continuous_actor'].get_action(T.cat((actor_inputs, new_discrete_actions_onehot), dim=1))
+                    self.network_dict['continuous_actor'].get_action(
+                        T.cat((actor_inputs, new_discrete_actions_onehot), dim=1))
                 new_actions = T.cat((new_discrete_actions_onehot, new_continuous_actions), dim=1)
 
                 new_values = T.min(self.network_dict['critic_1'](obs, new_actions, goal),
                                    self.network_dict['critic_2'](obs, new_actions, goal))
 
-                discrete_actor_loss = (self.network_dict['alpha_discrete'] * new_discrete_action_log_probs - new_values).mean()
+                discrete_actor_loss = (
+                            self.network_dict['alpha_discrete'] * new_discrete_action_log_probs - new_values).mean()
                 discrete_actor_loss.backward()
                 self.discrete_actor_optimizer.step()
 
                 self.alpha_discrete_optimizer.zero_grad()
-                discrete_alpha_loss = (self.network_dict['log_alpha_discrete'] * (-new_discrete_action_log_probs - self.target_discrete_entropy).detach()).mean()
+                discrete_alpha_loss = (self.network_dict['log_alpha_discrete'] * (
+                            -new_discrete_action_log_probs - self.target_discrete_entropy).detach()).mean()
                 discrete_alpha_loss.backward()
                 self.alpha_discrete_optimizer.step()
                 self.network_dict['alpha_discrete'] = self.network_dict['log_alpha_discrete'].exp()
 
-                continuous_actor_loss = (self.network_dict['alpha_continuous'] * new_continuous_action_log_probs - new_values).mean()
+                continuous_actor_loss = (
+                            self.network_dict['alpha_continuous'] * new_continuous_action_log_probs - new_values).mean()
                 continuous_actor_loss.backward()
                 self.continuous_actor_optimizer.step()
 
                 self.alpha_continuous_optimizer.zero_grad()
-                continuous_alpha_loss = (self.network_dict['log_alpha_continuous'] * (-new_continuous_action_log_probs - self.target_continuous_entropy).detach()).mean()
+                continuous_alpha_loss = (self.network_dict['log_alpha_continuous'] * (
+                            -new_continuous_action_log_probs - self.target_continuous_entropy).detach()).mean()
                 continuous_alpha_loss.backward()
                 self.alpha_continuous_optimizer.step()
                 self.network_dict['alpha_continuous'] = self.network_dict['log_alpha_continuous'].exp()
@@ -282,7 +294,9 @@ class GoalConditionedSAC(Agent):
         self.logger.add_scalar(tag='critic_2_loss', value=avg_critic_2_loss / steps, step=self.cur_ep)
         self.logger.add_scalar(tag='discrete_actor_loss', value=avg_discrete_actor_loss / steps, step=self.cur_ep)
         self.logger.add_scalar(tag='discrete_alpha', value=avg_discrete_alpha / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='discrete_policy_entropy', value=avg_discrete_policy_entropy / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='discrete_policy_entropy', value=avg_discrete_policy_entropy / steps,
+                               step=self.cur_ep)
         self.logger.add_scalar(tag='continuous_actor_loss', value=avg_continuous_actor_loss / steps, step=self.cur_ep)
         self.logger.add_scalar(tag='continuous_alpha', value=avg_continuous_alpha / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='continuous_policy_entropy', value=avg_continuous_policy_entropy / steps, step=self.cur_ep)
+        self.logger.add_scalar(tag='continuous_policy_entropy', value=avg_continuous_policy_entropy / steps,
+                               step=self.cur_ep)
