@@ -15,24 +15,34 @@ class GPASAC(Agent):
         self.env = env
         self.env.seed(seed)
         obs = self.env.reset()
-        algo_params.update({'state_dim': obs['observation'].shape[0],
-                            'goal_dim': obs['desired_goal'].shape[0],
-                            'discrete_action_dim': self.env.discrete_action_space.shape[0],
+        algo_params.update({'state_shape': obs['observation'].shape,
+                            'goal_shape': obs['desired_goal'].shape,
+                            'discrete_action_dim': self.env.discrete_action_space.n,
                             'continuous_action_dim': self.env.continuous_action_space.shape[0],
-                            'continuous_action_max': self.env.action_space.high,
-                            'continuous_action_scaling': self.env.action_space.high[0],
+                            'continuous_action_max': self.env.continuous_action_space.high,
+                            'continuous_action_scaling': self.env.continuous_action_space.high[0],
                             })
         # training args
         self.cur_ep = 0
+        self.warmup_episodes = algo_params['warmup_episodes']
         self.training_episodes = algo_params['training_episodes']
         self.testing_gap = algo_params['testing_gap']
         self.testing_episodes = algo_params['testing_episodes']
         self.saving_gap = algo_params['saving_gap']
 
+        self.demonstrate_skills = algo_params['demonstrate_skills']
+        self.demonstrate_percentage = algo_params['demonstrate_percentage']
+        assert 0 < self.demonstrate_percentage < 1, "Demonstrate percentage should be between 0 and 1"
+        self.n_demonstrate_episodes = int(self.demonstrate_percentage * self.training_episodes)
+        self.planned_skills = algo_params['planned_skills']
+        assert not (self.demonstrate_skills and self.planned_skills), "Cannot demonstrate and planned skills at the same time"
+        self.skill_plan = algo_params['skill_plan']
+        self.use_planned_skills = False
+
         if transition_tuple is None:
             transition_tuple = namedtuple("transition",
-                                          ('state', 'desired_goal', 'discrete_action', 'continuous_action',
-                                           'next_state', 'achieved_goal', 'reward', 'done'))
+                                          ('state', 'desired_goal', 'action',
+                                           'next_state', 'achieved_goal', 'reward', 'done', 'next_skill'))
         super(GPASAC, self).__init__(algo_params,
                                      non_flat_obs=True,
                                      action_type='hybrid',
@@ -50,15 +60,17 @@ class GPASAC(Agent):
                                                 fc1_size=1024,
                                                 log_std_min=-6, log_std_max=1,
                                                 action_scaling=self.continuous_action_scaling).to(self.device),
-            'critic_1': CriticPointNet(output_dim=1).to(self.device),
-            'critic_1_target': CriticPointNet(output_dim=1).to(self.device),
-            'critic_2': CriticPointNet(output_dim=1).to(self.device),
-            'critic_2_target': CriticPointNet(output_dim=1).to(self.device),
+            'critic_1': CriticPointNet(output_dim=1, action_dim=self.discrete_action_dim+self.continuous_action_dim).to(self.device),
+            'critic_1_target': CriticPointNet(output_dim=1, action_dim=self.discrete_action_dim+self.continuous_action_dim).to(self.device),
+            'critic_2': CriticPointNet(output_dim=1, action_dim=self.discrete_action_dim+self.continuous_action_dim).to(self.device),
+            'critic_2_target': CriticPointNet(output_dim=1, action_dim=self.discrete_action_dim+self.continuous_action_dim).to(self.device),
             'alpha_discrete': algo_params['alpha'],
             'log_alpha_discrete': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
             'alpha_continuous': algo_params['alpha'],
             'log_alpha_continuous': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
+        self.network_dict['critic_1_target'].eval()
+        self.network_dict['critic_2_target'].eval()
         self.network_keys_to_save = ['discrete_actor', 'continuous_actor', 'critic_1_target']
         self.discrete_actor_optimizer = Adam(self.network_dict['discrete_actor'].parameters(),
                                              lr=self.actor_learning_rate)
@@ -78,8 +90,6 @@ class GPASAC(Agent):
         self.critic_target_update_interval = algo_params['critic_target_update_interval']
 
     def run(self, test=False, render=False, load_network_ep=None, sleep=0):
-        # training setup uses a hierarchy of Epoch, Cycle and Episode
-        #   following the HER paper: https://papers.nips.cc/paper/2017/hash/453fadbd8a1a3af50a9df4df899537b5-Abstract.html
         if test:
             if load_network_ep is not None:
                 print("Loading network parameters...")
@@ -89,20 +99,29 @@ class GPASAC(Agent):
             print("Start training...")
 
         for ep in range(self.training_episodes):
+            if self.demonstrate_skills and (ep < self.n_demonstrate_episodes):
+                self.use_planned_skills = True
+            elif self.planned_skills:
+                self.use_planned_skills = True
+            else:
+                self.use_planned_skills = False
             self.cur_ep = ep
             ep_return = self._interact(render, test, sleep=sleep)
-            self.logger.add_scalar(tag='return', value=ep_return, step=self.cur_ep)
-            print("Episode" % ep, "return %0.1f" % ep_return)
+            self.logger.add_scalar(tag='Task/return', scalar_value=ep_return, global_step=self.cur_ep)
+            print("Episode %i" % ep, "return %0.1f" % ep_return)
+            if not test:
+                self._learn()
 
             if (ep % self.testing_gap == 0) and (ep != 0) and (not test):
+                if self.planned_skills:
+                    self.use_planned_skills = True
+                else:
+                    self.use_planned_skills = False
                 test_return = 0
-                test_success = 0
                 for test_ep in range(self.testing_episodes):
                     ep_test_return = self._interact(render, test=True)
                     test_return += ep_test_return
-                    if ep_test_return > -50:
-                        test_success += 1
-                self.logger.add_scalar(tag='test_return', value=test_return / self.testing_episodes, step=self.cur_ep)
+                self.logger.add_scalar(tag='Task/test_return', scalar_value=test_return / self.testing_episodes, global_step=self.cur_ep)
                 print("Episode %i" % ep, "test avg. return %0.1f" % (test_return / self.testing_episodes))
 
             if (ep % self.saving_gap == 0) and (ep != 0) and (not test):
@@ -123,42 +142,45 @@ class GPASAC(Agent):
         while not done:
             if render:
                 self.env.render()
-            discrete_action, continuous_action = self._select_action(obs, test=test)
-            new_obs, reward, done, info = self.env.step([discrete_action, continuous_action])
+            action = self._select_action(obs, test=test)
+            new_obs, reward, done, info = self.env.step(action)
             time.sleep(sleep)
             ep_return += reward
+
+            next_skill = 0
+            if self.planned_skills:
+                try:
+                    next_skill = self.skill_plan[self.env.step_count]
+                except:
+                    pass
+
             if not test:
-                self._remember(obs['observation'], obs['desired_goal'],
-                               discrete_action, continuous_action,
-                               new_obs['observation'], new_obs['achieved_goal'], reward, 1 - int(done),
+                self._remember(obs['observation'], obs['desired_goal'], action,
+                               new_obs['observation'], new_obs['achieved_goal'], reward, 1 - int(done), next_skill,
                                new_episode=new_episode)
 
             obs = new_obs
             new_episode = False
 
-            if not test:
-                self._learn()
         return ep_return
 
     def _select_action(self, obs, test=False):
-        obs_points = T.as_tensor(obs['observation'], dtype=T.float).to(self.device)
-        goal_points = T.as_tensor(obs['desired_goal'], dtype=T.float).to(self.device)
-        obs_point_features = self.network_dict['critic_1_target'].get_features(obs_points)
-        goal_point_features = self.network_dict['critic_1_target'].get_features(goal_points)
+        obs_points = T.as_tensor([obs['observation']], dtype=T.float).to(self.device)
+        goal_points = T.as_tensor([obs['desired_goal']], dtype=T.float).to(self.device)
+        obs_point_features = self.network_dict['critic_1_target'].get_features(obs_points.transpose(2, 1))
+        goal_point_features = self.network_dict['critic_1_target'].get_features(goal_points.transpose(2, 1))
         inputs = T.cat((obs_point_features, goal_point_features), dim=1)
-        discrete_action, _, _ = self.network_dict['discrete_actor'].get_action(inputs,
-                                                                               greedy=test).detach().cpu().numpy()
-        discrete_action_onehot = F.one_hot(T.as_tensor(discrete_action, dtype=T.long), self.discrete_action_dim).float()
+        if self.use_planned_skills:
+            discrete_action = T.as_tensor([self.skill_plan[self.env.step_count]], dtype=T.long).to(self.device)
+        else:
+            discrete_action, _, _ = self.network_dict['discrete_actor'].get_action(inputs, greedy=test)
+            discrete_action.type(T.long).flatten()
+        discrete_action_onehot = F.one_hot(discrete_action, self.discrete_action_dim).float()
         inputs = T.cat((inputs, discrete_action_onehot), dim=1)
-        continuous_action = self.network_dict['continuous_actor'].get_action(inputs,
-                                                                             mean_pi=test).detach().cpu().numpy()
-        return discrete_action, continuous_action
-
-    def _preprocess_points(self, points):
-        pass
+        continuous_action = self.network_dict['continuous_actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
+        return np.concatenate([discrete_action.detach().cpu().numpy(), continuous_action[0]], axis=0)
 
     def _learn(self, steps=None):
-        # todo: needs update
         if self.hindsight:
             self.buffer.modify_episodes()
         self.buffer.store_episodes()
@@ -184,16 +206,16 @@ class GPASAC(Agent):
                 weights = T.ones(size=(self.batch_size, 1), device=self.device)
                 inds = None
 
-            obs = T.as_tensor(batch.state, dtype=T.float32, device=self.device)
+            obs = T.as_tensor(batch.state, dtype=T.float32, device=self.device).transpose(2, 1)
             obs_features = self.network_dict['critic_1_target'].get_features(obs, detach=True)
-            goal = T.as_tensor(batch.desired_goal, dtype=T.float32, device=self.device)
+            goal = T.as_tensor(batch.desired_goal, dtype=T.float32, device=self.device).transpose(2, 1)
             goal_features = self.network_dict['critic_1_target'].get_features(goal, detach=True)
-            obs_ = T.as_tensor(batch.next_state, dtype=T.float32, device=self.device)
+            obs_ = T.as_tensor(batch.next_state, dtype=T.float32, device=self.device).transpose(2, 1)
             obs_features_ = self.network_dict['critic_1_target'].get_features(obs_, detach=True)
-            discrete_actions = T.as_tensor(batch.discrete_action, dtype=T.long, device=self.device).view(-1, 1)
+            actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
+            discrete_actions = actions[:, 0].type(T.long)
             discrete_actions_onehot = F.one_hot(discrete_actions, self.discrete_action_dim).float()
-            continuous_actions = T.as_tensor(batch.continuous_action, dtype=T.float32, device=self.device)
-            actions = T.cat((discrete_actions_onehot, continuous_actions), dim=1)
+            actions = T.cat((discrete_actions_onehot, actions[:, 1:]), dim=1)
             rewards = T.as_tensor(np.array(batch.reward), dtype=T.float32, device=self.device).unsqueeze(1)
             done = T.as_tensor(np.array(batch.done), dtype=T.float32, device=self.device).unsqueeze(1)
 
@@ -201,13 +223,19 @@ class GPASAC(Agent):
                 done = done * 0 + 1
 
             with T.no_grad():
-                actor_inputs_ = T.cat((obs_features_, goal_features), dim=1)
-                discrete_actions_, discrete_actions_log_probs_, _ = self.network_dict['discrete_actor'].get_action(
-                    actor_inputs_)
-                discrete_actions_onehot_ = F.one_hot(discrete_actions_, self.discrete_action_dim).float()
-                actor_inputs_ = T.cat((actor_inputs_, discrete_actions_onehot_), dim=1)
-                continuous_actions_, continuous_actions_log_probs_, _ = self.network_dict[
-                    'continuous_actor'].get_action(actor_inputs_)
+                if not self.planned_skills:
+                    discrete_actions_, discrete_actions_log_probs_, _ = self.network_dict['discrete_actor'].get_action(
+                        actor_inputs_)
+                    discrete_actions_onehot_ = F.one_hot(discrete_actions_.flatten(), self.discrete_action_dim).float()
+                else:
+                    discrete_actions_planned_ = T.as_tensor(batch.next_skill, dtype=T.long, device=self.device)
+                    discrete_actions_planned_onehot_ = F.one_hot(discrete_actions_planned_, self.discrete_action_dim).float()
+                    discrete_actions_onehot_ = discrete_actions_planned_onehot_
+                    discrete_actions_log_probs_ = T.ones(size=(self.batch_size, 1), device=self.device, dtype=T.float32)
+
+                actor_inputs_ = T.cat((obs_features_, goal_features, discrete_actions_onehot_), dim=1)
+                continuous_actions_, continuous_actions_log_probs_ = self.network_dict[
+                    'continuous_actor'].get_action(actor_inputs_, probs=True)
                 actions_ = T.cat((discrete_actions_onehot_, continuous_actions_), dim=1)
 
                 value_1_ = self.network_dict['critic_1_target'](obs_, actions_, goal)
@@ -245,28 +273,37 @@ class GPASAC(Agent):
                 self.discrete_actor_optimizer.zero_grad()
                 self.continuous_actor_optimizer.zero_grad()
                 actor_inputs = T.cat((obs_features, goal_features), dim=1)
-                new_discrete_actions, new_discrete_action_log_probs, new_discrete_action_entropy = \
-                    self.network_dict['discrete_actor'].get_action(actor_inputs)
-                new_discrete_actions_onehot = F.one_hot(new_discrete_actions, self.discrete_action_dim).float()
+                if not self.planned_skills:
+                    new_discrete_actions, new_discrete_action_log_probs, new_discrete_action_entropy = \
+                        self.network_dict['discrete_actor'].get_action(actor_inputs)
+                    new_discrete_actions_onehot = F.one_hot(new_discrete_actions.flatten(), self.discrete_action_dim).float()
+                else:
+                    new_discrete_actions_onehot = discrete_actions_onehot
+
                 new_continuous_actions, new_continuous_action_log_probs, new_continuous_action_entropy = \
                     self.network_dict['continuous_actor'].get_action(
-                        T.cat((actor_inputs, new_discrete_actions_onehot), dim=1))
+                        T.cat((actor_inputs, new_discrete_actions_onehot), dim=1), probs=True, entropy=True)
                 new_actions = T.cat((new_discrete_actions_onehot, new_continuous_actions), dim=1)
 
                 new_values = T.min(self.network_dict['critic_1'](obs, new_actions, goal),
                                    self.network_dict['critic_2'](obs, new_actions, goal))
 
-                discrete_actor_loss = (
-                            self.network_dict['alpha_discrete'] * new_discrete_action_log_probs - new_values).mean()
-                discrete_actor_loss.backward()
-                self.discrete_actor_optimizer.step()
+                if not self.planned_skills:
+                    discrete_actor_loss = (
+                                self.network_dict['alpha_discrete'] * new_discrete_action_log_probs - new_values).mean()
+                    discrete_actor_loss.backward(retain_graph=True)
+                    self.discrete_actor_optimizer.step()
 
-                self.alpha_discrete_optimizer.zero_grad()
-                discrete_alpha_loss = (self.network_dict['log_alpha_discrete'] * (
-                            -new_discrete_action_log_probs - self.target_discrete_entropy).detach()).mean()
-                discrete_alpha_loss.backward()
-                self.alpha_discrete_optimizer.step()
-                self.network_dict['alpha_discrete'] = self.network_dict['log_alpha_discrete'].exp()
+                    self.alpha_discrete_optimizer.zero_grad()
+                    discrete_alpha_loss = (self.network_dict['log_alpha_discrete'] * (
+                                -new_discrete_action_log_probs - self.target_discrete_entropy).detach()).mean()
+                    discrete_alpha_loss.backward()
+                    self.alpha_discrete_optimizer.step()
+                    self.network_dict['alpha_discrete'] = self.network_dict['log_alpha_discrete'].exp()
+
+                    avg_discrete_actor_loss += discrete_actor_loss.detach()
+                    avg_discrete_alpha += self.network_dict['alpha_discrete'].detach()
+                    avg_discrete_policy_entropy += new_discrete_action_entropy.detach().mean()
 
                 continuous_actor_loss = (
                             self.network_dict['alpha_continuous'] * new_continuous_action_log_probs - new_values).mean()
@@ -280,23 +317,20 @@ class GPASAC(Agent):
                 self.alpha_continuous_optimizer.step()
                 self.network_dict['alpha_continuous'] = self.network_dict['log_alpha_continuous'].exp()
 
-                avg_discrete_actor_loss += discrete_actor_loss.detach()
-                avg_discrete_alpha += self.network_dict['alpha_discrete'].detach()
-                avg_discrete_policy_entropy += new_discrete_action_entropy.detach().mean()
-
                 avg_continuous_actor_loss += continuous_actor_loss.detach()
                 avg_continuous_alpha += self.network_dict['alpha_continuous'].detach()
                 avg_continuous_policy_entropy += new_continuous_action_entropy.detach().mean()
 
             self.optim_step_count += 1
 
-        self.logger.add_scalar(tag='critic_1_loss', value=avg_critic_1_loss / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='critic_2_loss', value=avg_critic_2_loss / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='discrete_actor_loss', value=avg_discrete_actor_loss / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='discrete_alpha', value=avg_discrete_alpha / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='discrete_policy_entropy', value=avg_discrete_policy_entropy / steps,
-                               step=self.cur_ep)
-        self.logger.add_scalar(tag='continuous_actor_loss', value=avg_continuous_actor_loss / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='continuous_alpha', value=avg_continuous_alpha / steps, step=self.cur_ep)
-        self.logger.add_scalar(tag='continuous_policy_entropy', value=avg_continuous_policy_entropy / steps,
-                               step=self.cur_ep)
+        self.logger.add_scalar(tag='Critic/critic_1_loss', scalar_value=avg_critic_1_loss / steps, global_step=self.cur_ep)
+        self.logger.add_scalar(tag='Critic/critic_2_loss', scalar_value=avg_critic_2_loss / steps, global_step=self.cur_ep)
+        if not self.planned_skills:
+            self.logger.add_scalar(tag='Actor/discrete_actor_loss', scalar_value=avg_discrete_actor_loss / steps, global_step=self.cur_ep)
+            self.logger.add_scalar(tag='Actor/discrete_alpha', scalar_value=avg_discrete_alpha / steps, global_step=self.cur_ep)
+            self.logger.add_scalar(tag='Actor/discrete_policy_entropy', scalar_value=avg_discrete_policy_entropy / steps,
+                                   global_step=self.cur_ep)
+        self.logger.add_scalar(tag='Actor/continuous_actor_loss', scalar_value=avg_continuous_actor_loss / steps, global_step=self.cur_ep)
+        self.logger.add_scalar(tag='Actor/continuous_alpha', scalar_value=avg_continuous_alpha / steps, global_step=self.cur_ep)
+        self.logger.add_scalar(tag='Actor/continuous_policy_entropy', scalar_value=avg_continuous_policy_entropy / steps,
+                               global_step=self.cur_ep)

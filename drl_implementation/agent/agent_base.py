@@ -74,15 +74,16 @@ class Agent(object):
             self.state_shape = algo_params['state_shape']
         else:
             self.state_dim = algo_params['state_dim']
-        self.action_dim = algo_params['action_dim']
-        if self.action_type == 'continuous':
-            self.action_max = algo_params['action_max']
-            self.action_scaling = algo_params['action_scaling']
         if self.action_type == 'hybrid':
             self.discrete_action_dim = algo_params['discrete_action_dim']
             self.continuous_action_dim = algo_params['continuous_action_dim']
             self.continuous_action_max = algo_params['continuous_action_max']
             self.continuous_action_scaling = algo_params['continuous_action_scaling']
+        else:
+            self.action_dim = algo_params['action_dim']
+        if self.action_type == 'continuous':
+            self.action_max = algo_params['action_max']
+            self.action_scaling = algo_params['action_scaling']
 
         # goal-conditioned args & buffers
         self.goal_conditioned = goal_conditioned
@@ -109,11 +110,16 @@ class Agent(object):
                 if self.env.goal_conditioned_reward_function is not None:
                     goal_conditioned_reward_func = self.env.goal_conditioned_reward_function
 
+            try:
+                her_sample_strategy = algo_params['her_sampling_strategy']
+            except:
+                her_sample_strategy = 'future'
+
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
                                       transition_tuple=transition_tuple, prioritised=self.prioritised,
                                       seed=seed, rng=self.rng,
                                       goal_conditioned=True, store_goal_ind=store_goal_ind,
-                                      sampling_strategy=algo_params['her_sampling_strategy'],
+                                      sampling_strategy=her_sample_strategy,
                                       num_sampled_goal=4,
                                       terminal_on_achieved=algo_params['terminate_on_achieve'],
                                       goal_distance_threshold=goal_distance_threshold,
@@ -132,10 +138,12 @@ class Agent(object):
             self.normalizer = Normalizer(self.state_dim+self.goal_dim,
                                          algo_params['init_input_means'], algo_params['init_input_vars'],
                                          activated=self.observation_normalization)
-
+        try:
+            self.update_interval = algo_params['update_interval']
+        except:
+            self.update_interval = 1
         self.actor_learning_rate = algo_params['actor_learning_rate']
         self.critic_learning_rate = algo_params['critic_learning_rate']
-        self.update_interval = algo_params['update_interval']
         self.batch_size = algo_params['batch_size']
         self.optimizer_steps = algo_params['optimization_steps']
         self.gamma = algo_params['discount_factor']

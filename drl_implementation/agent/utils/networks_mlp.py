@@ -79,11 +79,11 @@ class StochasticActor(nn.Module):
             logits = self(inputs)
             if greedy:
                 actions = T.argmax(logits, dim=1, keepdim=True)
-                return actions
+                return actions, None, None
             action_probs = F.softmax(logits, dim=1)
             dist = Categorical(action_probs)
             actions = dist.sample().view(-1, 1)
-            log_probs = T.log(action_probs + epsilon)
+            log_probs = T.log(action_probs + epsilon).gather(1, actions)
             entropy = dist.entropy()
             return actions, log_probs, entropy
 

@@ -1,7 +1,8 @@
+import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
-from .pointnet2_utils import PointNetSetAbstraction
-from pointnet_utils import PointNetEncoder, feature_transform_reguliarzer
+from .pointnet_2_utils import PointNetSetAbstraction
+from .pointnet_utils import PointNetEncoder, feature_transform_reguliarzer
 
 
 class CriticPointNet(nn.Module):
