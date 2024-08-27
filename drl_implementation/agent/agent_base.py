@@ -118,7 +118,8 @@ class Agent(object):
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
                                       transition_tuple=transition_tuple, prioritised=self.prioritised,
                                       seed=seed, rng=self.rng,
-                                      goal_conditioned=True, store_goal_ind=store_goal_ind,
+                                      goal_conditioned=True, keep_episode=self.hindsight,
+                                      store_goal_ind=store_goal_ind,
                                       sampling_strategy=her_sample_strategy,
                                       num_sampled_goal=4,
                                       terminal_on_achieved=algo_params['terminate_on_achieve'],
@@ -153,8 +154,8 @@ class Agent(object):
 
         assert training_mode in ['episode_based', 'step_based']
         self.training_mode = training_mode
-        self.env_step_count = 0
-        self.env_episode_count = 0
+        self.total_env_step_count = 0
+        self.total_env_episode_count = 0
 
         # network dict is filled in each specific agent
         self.network_dict = {}

@@ -65,34 +65,47 @@ class ReplayBuffer(object):
 
 
 class EpisodeWiseReplayBuffer(object):
-    def __init__(self, capacity, tr_namedtuple, seed=0):
+    def __init__(self, capacity, tr_namedtuple, keep_episode, seed=0):
         R.seed(seed)
         self.capacity = capacity
         self.memory = []
         self.position = 0
         self.new_episode = False
+        self.keep_episode = keep_episode
         self.episodes = []
         self.ep_position = -1
+        self.modified_episodes = []
         self.Transition = tr_namedtuple
 
     def store_experience(self, *args):
         # $new_episode is a boolean value
-        if self.new_episode:
+        if self.new_episode and self.keep_episode:
             self.episodes.append([])
             self.ep_position += 1
         self.episodes[self.ep_position].append(self.Transition(*args))
 
-    def store_episodes(self):
-        if len(self.episodes) == 0:
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.position] = self.Transition(*args)
+        self.position = (self.position + 1) % self.capacity
+
+    def hindsight(self):
+        self.modify_episodes()
+        self.store_modified_episodes()
+
+    def modify_episodes(self):
+        pass
+
+    def store_modified_episodes(self):
+        if len(self.modified_episodes) == 0:
             return
-        for ep in self.episodes:
+        for ep in self.modified_episodes:
             for n in range(len(ep)):
                 if len(self.memory) < self.capacity:
                     self.memory.append(None)
                 self.memory[self.position] = ep[n]
                 self.position = (self.position + 1) % self.capacity
-        self.episodes.clear()
-        self.ep_position = -1
+        self.modified_episodes.clear()
 
     def sample(self, batch_size):
         batch = R.sample(self.memory, batch_size)
@@ -104,7 +117,7 @@ class EpisodeWiseReplayBuffer(object):
 
 class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
     def __init__(self, capacity, tr_namedtuple, reward_func=None,
-                 store_goal_ind=False,
+                 store_goal_ind=False, keep_episode=False,
                  sampling_strategy='future', sampled_goal_num=6, terminate_on_achieve=False,
                  goal_distance_threshold=0.05,
                  seed=0):
@@ -117,7 +130,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
         if self.reward_func is None:
             self.reward_func = goal_distance_reward
         self.store_goal_ind = store_goal_ind
-        EpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, seed)
+        EpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, keep_episode, seed)
 
     def modify_episodes(self):
         if len(self.episodes) == 0:
@@ -148,7 +161,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                             modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
                         else:
                             modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d, ep[tr].goal_ind))
-                    self.episodes.append(modified_ep)
+                    self.modified_episodes.append(modified_ep)
         else:
             for _ in range(len(self.episodes)):
                 # 'future' strategy
@@ -176,7 +189,10 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         else:
                             modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d, ep[tr_ind].goal_ind))
 
-                    self.episodes.append(modified_ep)
+                    self.modified_episodes.append(modified_ep)
+
+        self.episodes.clear()
+        self.ep_position = -1
 
     def sample_achieved_goal(self, ep):
         goals = [[], []]
@@ -305,7 +321,7 @@ class PrioritisedReplayBuffer(object):
 
 
 class PrioritisedEpisodeWiseReplayBuffer(object):
-    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, epsilon=1e-6, rng=None):
+    def __init__(self, capacity, tr_namedtuple, keep_episode, alpha=0.5, beta=0.8, epsilon=1e-6, rng=None):
         if rng is None:
             self.rng = np.random.default_rng(seed=0)
         else:
@@ -314,7 +330,9 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
         self.memory = []
         self.mem_position = 0
         self.new_episode = False
+        self.keep_episode = keep_episode
         self.episodes = []
+        self.modified_episodes = []
         self.ep_position = -1
         self.Transition = tr_namedtuple
         self.alpha = alpha
@@ -328,15 +346,29 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
         self._max_priority = 1.0
 
     def store_experience(self, *args):
-        if self.new_episode:
+        if self.new_episode and self.keep_episode:
             self.episodes.append([])
             self.ep_position += 1
         self.episodes[self.ep_position].append(self.Transition(*args))
 
-    def store_episodes(self):
-        if len(self.episodes) == 0:
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.mem_position] = self.Transition(*args)
+        self.sum_tree[self.mem_position] = self._max_priority ** self.alpha
+        self.min_tree[self.mem_position] = self._max_priority ** self.alpha
+        self.mem_position = (self.mem_position + 1) % self.capacity
+
+    def hindsight(self):
+        self.modify_episodes()
+        self.store_modified_episodes()
+
+    def modify_episodes(self):
+        pass
+
+    def store_modified_episodes(self):
+        if len(self.modified_episodes) == 0:
             return
-        for ep in self.episodes:
+        for ep in self.modified_episodes:
             for n in range(len(ep)):
                 if len(self.memory) < self.capacity:
                     self.memory.append(None)
@@ -344,8 +376,7 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
                 self.sum_tree[self.mem_position] = self._max_priority ** self.alpha
                 self.min_tree[self.mem_position] = self._max_priority ** self.alpha
                 self.mem_position = (self.mem_position + 1) % self.capacity
-        self.episodes.clear()
-        self.ep_position = -1
+        self.modified_episodes.clear()
 
     def sample(self, batch_size, beta=None):
         if beta is None:
@@ -388,7 +419,7 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
 
 
 class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
-    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, store_goal_ind=False,
+    def __init__(self, capacity, tr_namedtuple, alpha=0.5, beta=0.8, store_goal_ind=False, keep_episode=False,
                  sampling_strategy='future', sampled_goal_num=4, terminate_on_achieve=False,
                  goal_distance_threshold=0.05, reward_func=None,
                  rng=None):
@@ -400,7 +431,8 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
         self.reward_func = reward_func
         if self.reward_func is None:
             self.reward_func = goal_distance_reward
-        PrioritisedEpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, alpha=alpha, beta=beta, rng=rng)
+        PrioritisedEpisodeWiseReplayBuffer.__init__(self, capacity, tr_namedtuple, keep_episode,
+                                                    alpha=alpha, beta=beta, rng=rng)
 
     def modify_episodes(self):
         if len(self.episodes) == 0:
@@ -428,7 +460,7 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                         else:
                             d = ep[tr].done
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                    self.episodes.append(modified_ep)
+                    self.modified_episodes.append(modified_ep)
         else:
             for _ in range(len(self.episodes)):
                 # 'future' strategy
@@ -451,7 +483,10 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
                         else:
                             d = ep[tr_ind].done
                         modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                    self.episodes.append(modified_ep)
+                    self.modified_episodes.append(modified_ep)
+
+        self.episodes.clear()
+        self.ep_position = -1
 
     def sample_achieved_goal(self, ep):
         goals = [[], []]
@@ -473,8 +508,8 @@ def goal_distance_reward(goal_a, goal_b, distance_threshold=0.05):
 
 
 def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, rng=None,
-                # the last 4 args are only for goal-conditioned RL buffers
-                goal_conditioned=False, store_goal_ind=False, sampling_strategy='future', num_sampled_goal=4, terminal_on_achieved=True,
+                goal_conditioned=False, keep_episode=False,
+                store_goal_ind=False, sampling_strategy='future', num_sampled_goal=4, terminal_on_achieved=True,
                 goal_distance_threshold=0.05, goal_conditioned_reward_func=None):
     t = namedtuple("transition", ('state', 'action', 'next_state', 'reward', 'done'))
     t_goal = namedtuple("transition",
@@ -495,6 +530,7 @@ def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, 
         if not prioritised:
             buffer = HindsightReplayBuffer(mem_capacity, transition_tuple,
                                            store_goal_ind=store_goal_ind,
+                                           keep_episode=keep_episode,
                                            sampling_strategy=sampling_strategy,
                                            sampled_goal_num=num_sampled_goal,
                                            terminate_on_achieve=terminal_on_achieved,
@@ -505,6 +541,7 @@ def make_buffer(mem_capacity, transition_tuple=None, prioritised=False, seed=0, 
             buffer = PrioritisedHindsightReplayBuffer(mem_capacity,
                                                       transition_tuple,
                                                       store_goal_ind=store_goal_ind,
+                                                      keep_episode=keep_episode,
                                                       sampling_strategy=sampling_strategy,
                                                       sampled_goal_num=num_sampled_goal,
                                                       terminate_on_achieve=terminal_on_achieved,

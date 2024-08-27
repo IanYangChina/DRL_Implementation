@@ -22,6 +22,8 @@ class SAC(Agent):
                             'init_input_vars': None
                             })
         # training args
+        self.cur_ep = 0
+        self.warmup_step = algo_params['warmup_step']
         self.training_episodes = algo_params['training_episodes']
         self.testing_gap = algo_params['testing_gap']
         self.testing_episodes = algo_params['testing_episodes']
@@ -54,7 +56,6 @@ class SAC(Agent):
         self.target_entropy = -self.action_dim
         self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.actor_learning_rate)
         # training args
-        self.warmup_step = algo_params['warmup_step']
         self.actor_update_interval = algo_params['actor_update_interval']
         self.critic_target_update_interval = algo_params['critic_target_update_interval']
         # statistic dict
@@ -71,6 +72,7 @@ class SAC(Agent):
             print("Start training...")
 
         for ep in range(num_episode):
+            self.cur_ep = ep
             ep_return = self._interact(render, test, sleep=sleep)
             self.logger.add_scalar(tag='Task/return', scalar_value=ep_return, global_step=ep)
             print("Episode %i" % ep, "return %0.1f" % ep_return)
@@ -99,7 +101,7 @@ class SAC(Agent):
         while not done:
             if render:
                 self.env.render()
-            if self.env_step_count < self.warmup_step:
+            if self.total_env_step_count < self.warmup_step:
                 action = self.env.action_space.sample()
             else:
                 action = self._select_action(obs, test=test)
@@ -108,9 +110,9 @@ class SAC(Agent):
             ep_return += reward
             if not test:
                 self._remember(obs, action, new_obs, reward, 1 - int(done))
-                if (self.env_step_count % self.update_interval == 0) and (self.env_step_count > self.warmup_step):
+                if self.total_env_step_count % self.update_interval == 0:
                     self._learn()
-                self.env_step_count += 1
+                self.total_env_step_count += 1
             obs = new_obs
         return ep_return
 

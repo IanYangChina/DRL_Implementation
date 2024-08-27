@@ -24,7 +24,7 @@ class GPASAC(Agent):
                             })
         # training args
         self.cur_ep = 0
-        self.warmup_episodes = algo_params['warmup_episodes']
+        self.warmup_step = algo_params['warmup_step']
         self.training_episodes = algo_params['training_episodes']
         self.testing_gap = algo_params['testing_gap']
         self.testing_episodes = algo_params['testing_episodes']
@@ -109,8 +109,8 @@ class GPASAC(Agent):
             ep_return = self._interact(render, test, sleep=sleep)
             self.logger.add_scalar(tag='Task/return', scalar_value=ep_return, global_step=self.cur_ep)
             print("Episode %i" % ep, "return %0.1f" % ep_return)
-            if not test:
-                self._learn()
+            if not test and self.hindsight:
+                self.buffer.hindsight()
 
             if (ep % self.testing_gap == 0) and (ep != 0) and (not test):
                 if self.planned_skills:
@@ -142,7 +142,10 @@ class GPASAC(Agent):
         while not done:
             if render:
                 self.env.render()
-            action = self._select_action(obs, test=test)
+            if self.total_env_step_count < self.warmup_step:
+                action = self.env.action_space.sample()
+            else:
+                action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
             time.sleep(sleep)
             ep_return += reward
@@ -158,6 +161,8 @@ class GPASAC(Agent):
                 self._remember(obs['observation'], obs['desired_goal'], action,
                                new_obs['observation'], new_obs['achieved_goal'], reward, 1 - int(done), next_skill,
                                new_episode=new_episode)
+                self.total_env_step_count += 1
+                self._learn(steps=1)
 
             obs = new_obs
             new_episode = False
@@ -181,9 +186,6 @@ class GPASAC(Agent):
         return np.concatenate([discrete_action.detach().cpu().numpy(), continuous_action[0]], axis=0)
 
     def _learn(self, steps=None):
-        if self.hindsight:
-            self.buffer.modify_episodes()
-        self.buffer.store_episodes()
         if len(self.buffer) < self.batch_size:
             return
         if steps is None:
