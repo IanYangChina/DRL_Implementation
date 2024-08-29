@@ -115,13 +115,18 @@ class Agent(object):
             except:
                 her_sample_strategy = 'future'
 
+            try:
+                num_sampled_goal = algo_params['num_sampled_goal']
+            except:
+                num_sampled_goal = 4
+
             self.buffer = make_buffer(mem_capacity=algo_params['memory_capacity'],
                                       transition_tuple=transition_tuple, prioritised=self.prioritised,
                                       seed=seed, rng=self.rng,
                                       goal_conditioned=True, keep_episode=self.hindsight,
                                       store_goal_ind=store_goal_ind,
                                       sampling_strategy=her_sample_strategy,
-                                      num_sampled_goal=4,
+                                      num_sampled_goal=num_sampled_goal,
                                       terminal_on_achieved=algo_params['terminate_on_achieve'],
                                       goal_distance_threshold=goal_distance_threshold,
                                       goal_conditioned_reward_func=goal_conditioned_reward_func)

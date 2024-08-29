@@ -143,7 +143,12 @@ class GPASAC(Agent):
             if render:
                 self.env.render()
             if self.total_env_step_count < self.warmup_step:
-                action = self.env.action_space.sample()
+                if self.use_planned_skills:
+                    discrete_action = self.skill_plan[self.env.step_count]
+                else:
+                    discrete_action = self.env.discrete_action_space.sample()
+                continuous_action = self.env.continuous_action_space.sample()
+                action = np.concatenate([[discrete_action], continuous_action], axis=0)
             else:
                 action = self._select_action(obs, test=test)
             new_obs, reward, done, info = self.env.step(action)
@@ -214,6 +219,7 @@ class GPASAC(Agent):
             goal_features = self.network_dict['critic_1_target'].get_features(goal, detach=True)
             obs_ = T.as_tensor(batch.next_state, dtype=T.float32, device=self.device).transpose(2, 1)
             obs_features_ = self.network_dict['critic_1_target'].get_features(obs_, detach=True)
+            actor_inputs_ = T.cat((obs_features_, goal_features), dim=1)
             actions = T.as_tensor(batch.action, dtype=T.float32, device=self.device)
             discrete_actions = actions[:, 0].type(T.long)
             discrete_actions_onehot = F.one_hot(discrete_actions, self.discrete_action_dim).float()
@@ -235,7 +241,7 @@ class GPASAC(Agent):
                     discrete_actions_onehot_ = discrete_actions_planned_onehot_
                     discrete_actions_log_probs_ = T.ones(size=(self.batch_size, 1), device=self.device, dtype=T.float32)
 
-                actor_inputs_ = T.cat((obs_features_, goal_features, discrete_actions_onehot_), dim=1)
+                actor_inputs_ = T.cat((actor_inputs_, discrete_actions_onehot_), dim=1)
                 continuous_actions_, continuous_actions_log_probs_ = self.network_dict[
                     'continuous_actor'].get_action(actor_inputs_, probs=True)
                 actions_ = T.cat((discrete_actions_onehot_, continuous_actions_), dim=1)

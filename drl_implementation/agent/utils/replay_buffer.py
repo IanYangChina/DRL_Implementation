@@ -79,10 +79,11 @@ class EpisodeWiseReplayBuffer(object):
 
     def store_experience(self, *args):
         # $new_episode is a boolean value
-        if self.new_episode and self.keep_episode:
-            self.episodes.append([])
-            self.ep_position += 1
-        self.episodes[self.ep_position].append(self.Transition(*args))
+        if self.keep_episode:
+            if self.new_episode:
+                self.episodes.append([])
+                self.ep_position += 1
+            self.episodes[self.ep_position].append(self.Transition(*args))
 
         if len(self.memory) < self.capacity:
             self.memory.append(None)
@@ -139,7 +140,7 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
             # 'episode' or 'final' strategy
             for _ in range(len(self.episodes)):
                 ep = self.episodes[_]
-                if len(ep) < self.k:
+                if (len(ep) < self.k) and self.sampling_strategy != 'final':
                     continue
                 imagined_goals = self.sample_achieved_goal(ep)
                 for n in range(len(imagined_goals[0])):
@@ -150,17 +151,25 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         s = ep[tr].state
                         dg = goal
                         a = ep[tr].action
-                        ns = ep[tr].next_state
+                        modified_tr = [s, dg, a]
+                        if 'next_state' in self.Transition._fields:
+                            ns = ep[tr].next_state
+                            modified_tr.append(ns)
                         ag = ep[tr].achieved_goal
+                        modified_tr.append(ag)
                         r = self.reward_func(dg, ag, self.goal_distance_threshold)
-                        if self.terminate_on_achieve:
-                            d = 0 if r == 0.0 else 1
-                        else:
-                            d = ep[tr].done
-                        if not self.store_goal_ind:
-                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                        else:
-                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d, ep[tr].goal_ind))
+                        modified_tr.append(r)
+                        if 'done' in self.Transition._fields:
+                            if self.terminate_on_achieve:
+                                d = 0 if r == 0.0 else 1
+                            else:
+                                d = ep[tr].done
+                            modified_tr.append(d)
+                        if 'next_skill' in self.Transition._fields:
+                            modified_tr.append(ep[tr].next_skill)
+                        if self.store_goal_ind:
+                            modified_tr.append(ep[tr].goal_ind)
+                        modified_ep.append(self.Transition(*modified_tr))
                     self.modified_episodes.append(modified_ep)
         else:
             for _ in range(len(self.episodes)):
@@ -176,18 +185,25 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                         s = ep[tr_ind].state
                         dg = ep[ind].achieved_goal
                         a = ep[tr_ind].action
-                        ns = ep[tr_ind].next_state
+                        modified_tr = [s, dg, a]
+                        if 'next_state' in self.Transition._fields:
+                            ns = ep[tr_ind].next_state
+                            modified_tr.append(ns)
                         ag = ep[tr_ind].achieved_goal
+                        modified_tr.append(ag)
                         r = self.reward_func(dg, ag, self.goal_distance_threshold)
-                        if self.terminate_on_achieve:
-                            d = 0 if r == 0.0 else 1
-                        else:
-                            d = ep[tr_ind].done
-
-                        if not self.store_goal_ind:
-                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d))
-                        else:
-                            modified_ep.append(self.Transition(s, dg, a, ns, ag, r, d, ep[tr_ind].goal_ind))
+                        modified_tr.append(r)
+                        if 'done' in self.Transition._fields:
+                            if self.terminate_on_achieve:
+                                d = 0 if r == 0.0 else 1
+                            else:
+                                d = ep[tr_ind].done
+                            modified_tr.append(d)
+                        if 'next_skill' in self.Transition._fields:
+                            modified_tr.append(ep[tr_ind].next_skill)
+                        if self.store_goal_ind:
+                            modified_tr.append(ep[tr_ind].goal_ind)
+                        modified_ep.append(self.Transition(*modified_tr))
 
                     self.modified_episodes.append(modified_ep)
 
@@ -346,10 +362,11 @@ class PrioritisedEpisodeWiseReplayBuffer(object):
         self._max_priority = 1.0
 
     def store_experience(self, *args):
-        if self.new_episode and self.keep_episode:
-            self.episodes.append([])
-            self.ep_position += 1
-        self.episodes[self.ep_position].append(self.Transition(*args))
+        if self.keep_episode:
+            if self.new_episode:
+                self.episodes.append([])
+                self.ep_position += 1
+            self.episodes[self.ep_position].append(self.Transition(*args))
 
         if len(self.memory) < self.capacity:
             self.memory.append(None)
@@ -441,7 +458,7 @@ class PrioritisedHindsightReplayBuffer(PrioritisedEpisodeWiseReplayBuffer):
             for _ in range(len(self.episodes)):
                 # 'episode' or 'final' strategy
                 ep = self.episodes[_]
-                if len(ep) < self.k:
+                if (len(ep) < self.k) and self.sampling_strategy != 'final':
                     continue
                 imagined_goals = self.sample_achieved_goal(ep)
                 for n in range(len(imagined_goals[0])):
