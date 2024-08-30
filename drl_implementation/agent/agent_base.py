@@ -1,7 +1,9 @@
 import os
+import logging as info_logging
 import torch as T
 import numpy as np
 import json
+import subprocess as sp
 from torch.utils.tensorboard import SummaryWriter
 from .utils.plot import smoothed_plot
 from .utils.replay_buffer import make_buffer
@@ -13,9 +15,28 @@ def mkdir(paths):
         os.makedirs(path, exist_ok=True)
 
 
+def get_gpu_memory():
+    command = "nvidia-smi --query-gpu=memory.free --format=csv"
+    memory_free_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
+    memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+    return memory_free_values
+
+
+def reset_logging(logging_to_reset):
+    loggers = [logging_to_reset.getLogger(name) for name in logging_to_reset.root.manager.loggerDict]
+    loggers.append(logging_to_reset.getLogger())
+    for logger in loggers:
+        handlers = logger.handlers[:]
+        for handler in handlers:
+            logger.removeHandler(handler)
+            handler.close()
+        logger.setLevel(logging_to_reset.NOTSET)
+        logger.propagate = True
+
+
 class Agent(object):
     def __init__(self,
-                 algo_params, create_logger=False,
+                 algo_params, logging=None, create_logger=False,
                  transition_tuple=None,
                  non_flat_obs=False, action_type='continuous',
                  goal_conditioned=False, store_goal_ind=False, training_mode='episode_based',
@@ -65,6 +86,18 @@ class Agent(object):
         self.create_logger = create_logger
         if self.create_logger:
             self.logger = SummaryWriter(log_dir=self.data_path, comment=comment)
+        self.logging = logging
+        if self.logging is None:
+            reset_logging(info_logging)
+            log_file_name = os.path.join(self.data_path, 'optimisation.log')
+            if os.path.isfile(log_file_name):
+                filemode = "a"
+            else:
+                filemode = "w"
+            info_logging.basicConfig(level=info_logging.NOTSET, filemode=filemode,
+                                filename=log_file_name,
+                                format="%(asctime)s %(levelname)s %(message)s")
+            self.logging = info_logging
 
         # non-goal-conditioned args
         self.non_flat_obs = non_flat_obs
@@ -172,6 +205,7 @@ class Agent(object):
             'actor_loss': [],
             'critic_loss': [],
         }
+        self.get_gpu_memory = get_gpu_memory
 
     def run(self, render=False, test=False, load_network_ep=None, sleep=0):
         raise NotImplementedError

@@ -10,7 +10,7 @@ from collections import namedtuple
 
 
 class OneStepSAC(Agent):
-    def __init__(self, algo_params, env, transition_tuple=None, path=None, seed=-1):
+    def __init__(self, algo_params, env, logging=None, transition_tuple=None, path=None, seed=-1):
         # environment
         self.env = env
         self.env.seed(seed)
@@ -37,6 +37,7 @@ class OneStepSAC(Agent):
                                          goal_conditioned=True,
                                          path=path,
                                          seed=seed,
+                                         logging=logging,
                                          create_logger=True)
         # torch
         self.network_dict.update({
@@ -70,13 +71,23 @@ class OneStepSAC(Agent):
         else:
             num_episode = self.training_episodes
             print("Start training...")
+            self.logging.info("Start training...")
 
         for ep in range(num_episode):
             self.cur_ep = ep
             loss_info = self._interact(render, test, sleep=sleep)
             self.logger.add_scalar(tag='Task/return', scalar_value=loss_info['emd_loss'], global_step=ep)
             self.logger.add_scalar(tag='Task/heightmap_loss', scalar_value=loss_info['height_map_loss'], global_step=ep)
-            print("Episode %i" % ep, "return %0.1f" % loss_info['emd_loss'])
+            GPU_memory = self.get_gpu_memory()
+            self.logger.add_scalar(tag='System/Free GPU memory', scalar_value=GPU_memory[0], global_step=ep)
+            try:
+                self.logger.add_scalar(tag='System/Used GPU memory', scalar_value=GPU_memory[1], global_step=ep)
+            except:
+                pass
+            print("Episode %i" % ep, "return %0.1f" % loss_info['emd_loss'],
+                  "heightmap loss %0.1f" % loss_info['height_map_loss'])
+            self.logging.info("Episode %i" % ep + " return %0.1f" % loss_info['emd_loss'] +
+                              " heightmap loss %0.1f" % loss_info['height_map_loss'])
             if not test and self.hindsight:
                 self.buffer.hindsight()
 
@@ -90,15 +101,20 @@ class OneStepSAC(Agent):
                 self.logger.add_scalar(tag='Task/test_return',
                                        scalar_value=(sum(ep_test_return) / self.testing_episodes), global_step=ep)
                 self.logger.add_scalar(tag='Task/test_heightmap_loss',
-                                       scalar_value=(sum(ep_test_heightmap_loss) / self.testing_episodes), global_step=ep)
-                print("Episode %i" % ep, "test return %0.1f" % (sum(ep_test_return) / self.testing_episodes))
+                                       scalar_value=(sum(ep_test_heightmap_loss) / self.testing_episodes),
+                                       global_step=ep)
+                print("Episode %i" % ep, "test return %0.1f" % (sum(ep_test_return) / self.testing_episodes),
+                      "test heightmap loss %0.1f" % (sum(ep_test_heightmap_loss) / self.testing_episodes))
+                self.logging.info(
+                    "Episode %i" % ep + " test return %0.1f" % (sum(ep_test_return) / self.testing_episodes) +
+                    " test heightmap loss %0.1f" % (sum(ep_test_heightmap_loss) / self.testing_episodes))
 
             if (ep % self.saving_gap == 0) and (ep != 0) and (not test):
                 self._save_network(ep=ep)
 
         if not test:
             print("Finished training")
-            print("Saving statistics...")
+            self.logging.info("Finished training")
         else:
             print("Finished testing")
 
