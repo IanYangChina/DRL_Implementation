@@ -45,9 +45,12 @@ class OneStepSAC(Agent):
                                      action_scaling=self.action_scaling).to(self.device),
             'critic_1': CriticPointNet(output_dim=1, action_dim=self.action_dim).to(self.device),
             'critic_2': CriticPointNet(output_dim=1, action_dim=self.action_dim).to(self.device),
+            'critic_target': CriticPointNet(output_dim=1, action_dim=self.action_dim).to(self.device),
             'alpha': algo_params['alpha'],
             'log_alpha': T.tensor(np.log(algo_params['alpha']), requires_grad=True, device=self.device),
         })
+        self.network_dict['critic_target'].eval()
+        self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_target'], tau=1)
         self.network_keys_to_save = ['actor', 'critic_1']
         self.actor_optimizer = Adam(self.network_dict['actor'].parameters(), lr=self.actor_learning_rate)
         self.critic_1_optimizer = Adam(self.network_dict['critic_1'].parameters(), lr=self.critic_learning_rate)
@@ -123,8 +126,8 @@ class OneStepSAC(Agent):
     def _select_action(self, obs, test=False):
         obs_points = T.as_tensor([obs['observation']], dtype=T.float).to(self.device)
         goal_points = T.as_tensor([obs['desired_goal']], dtype=T.float).to(self.device)
-        obs_point_features = self.network_dict['critic_1'].get_features(obs_points.transpose(2, 1), detach=True)
-        goal_point_features = self.network_dict['critic_1'].get_features(goal_points.transpose(2, 1), detach=True)
+        obs_point_features = self.network_dict['critic_target'].get_features(obs_points.transpose(2, 1))
+        goal_point_features = self.network_dict['critic_target'].get_features(goal_points.transpose(2, 1))
         inputs = T.cat((obs_point_features, goal_point_features), dim=1)
         action = self.network_dict['actor'].get_action(inputs, mean_pi=test).detach().cpu().numpy()
         return action[0]
@@ -198,6 +201,8 @@ class OneStepSAC(Agent):
                 avg_policy_entropy += new_entropy.detach().mean()
 
             self.optim_step_count += 1
+
+        self._soft_update(self.network_dict['critic_1'], self.network_dict['critic_target'], tau=1)
 
         self.logger.add_scalar(tag='Critic/critic_1_loss', scalar_value=avg_critic_1_loss / steps,
                                global_step=self.cur_ep)
