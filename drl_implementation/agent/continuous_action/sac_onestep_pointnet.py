@@ -70,18 +70,24 @@ class OneStepSAC(Agent):
 
         for ep in range(num_episode):
             self.cur_ep = ep
-            ep_return = self._interact(render, test, sleep=sleep)
-            self.logger.add_scalar(tag='Task/return', scalar_value=ep_return, global_step=ep)
-            print("Episode %i" % ep, "return %0.1f" % ep_return)
+            loss_info = self._interact(render, test, sleep=sleep)
+            self.logger.add_scalar(tag='Task/return', scalar_value=loss_info['emd_loss'], global_step=ep)
+            self.logger.add_scalar(tag='Task/heightmap_loss', scalar_value=loss_info['height_map_loss'], global_step=ep)
+            print("Episode %i" % ep, "return %0.1f" % loss_info['emd_loss'])
             if not test and self.hindsight:
                 self.buffer.hindsight()
 
             if (ep % self.testing_gap == 0) and (ep != 0) and (not test):
                 ep_test_return = []
+                ep_test_heightmap_loss = []
                 for test_ep in range(self.testing_episodes):
-                    ep_test_return.append(self._interact(render, test=True))
+                    loss_info = self._interact(render, test=True)
+                    ep_test_return.append(loss_info['emd_loss'])
+                    ep_test_heightmap_loss.append(loss_info['height_map_loss'])
                 self.logger.add_scalar(tag='Task/test_return',
                                        scalar_value=(sum(ep_test_return) / self.testing_episodes), global_step=ep)
+                self.logger.add_scalar(tag='Task/test_heightmap_loss',
+                                       scalar_value=(sum(ep_test_heightmap_loss) / self.testing_episodes), global_step=ep)
                 print("Episode %i" % ep, "test return %0.1f" % (sum(ep_test_return) / self.testing_episodes))
 
             if (ep % self.saving_gap == 0) and (ep != 0) and (not test):
@@ -112,7 +118,7 @@ class OneStepSAC(Agent):
                 self._learn()
             self.total_env_step_count += 1
 
-        return reward
+        return info
 
     def _select_action(self, obs, test=False):
         obs_points = T.as_tensor([obs['observation']], dtype=T.float).to(self.device)
