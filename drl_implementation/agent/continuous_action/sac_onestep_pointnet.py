@@ -6,6 +6,7 @@ from torch.optim.adam import Adam
 from ..utils.networks_mlp import StochasticActor
 from ..utils.networks_pointnet import CriticPointNet
 from ..agent_base import Agent
+from ..utils.exploration_strategy import GaussianNoise
 from collections import namedtuple
 
 
@@ -60,6 +61,13 @@ class OneStepSAC(Agent):
         self.alpha_optimizer = Adam([self.network_dict['log_alpha']], lr=self.actor_learning_rate)
         # training args
         self.actor_update_interval = algo_params['actor_update_interval']
+        self.use_demonstrations = algo_params['use_demonstrations']
+        self.demonstrate_percentage = algo_params['demonstrate_percentage']
+        assert 0 < self.demonstrate_percentage < 1, "Demonstrate percentage should be between 0 and 1"
+        self.n_demonstrate_episodes = int(self.demonstrate_percentage * self.training_episodes)
+        self.demonstration_action = np.asarray(algo_params['demonstration_action'], dtype=np.float32)
+        self.gaussian_noise = GaussianNoise(action_dim=self.action_dim, action_max=self.action_max,
+                                            sigma=0.1, rng=self.rng)
 
     def run(self, test=False, render=False, load_network_ep=None, sleep=0):
         if test:
@@ -76,7 +84,7 @@ class OneStepSAC(Agent):
         for ep in range(num_episode):
             self.cur_ep = ep
             loss_info = self._interact(render, test, sleep=sleep)
-            self.logger.add_scalar(tag='Task/return', scalar_value=loss_info['emd_loss'], global_step=ep)
+            self.logger.add_scalar(tag='Task/emd_loss', scalar_value=loss_info['emd_loss'], global_step=ep)
             self.logger.add_scalar(tag='Task/heightmap_loss', scalar_value=loss_info['height_map_loss'], global_step=ep)
             GPU_memory = self.get_gpu_memory()
             self.logger.add_scalar(tag='System/Free GPU memory', scalar_value=GPU_memory[0], global_step=ep)
@@ -96,9 +104,10 @@ class OneStepSAC(Agent):
                 ep_test_heightmap_loss = []
                 for test_ep in range(self.testing_episodes):
                     loss_info = self._interact(render, test=True)
+                    self.cur_ep += 1
                     ep_test_return.append(loss_info['emd_loss'])
                     ep_test_heightmap_loss.append(loss_info['height_map_loss'])
-                self.logger.add_scalar(tag='Task/test_return',
+                self.logger.add_scalar(tag='Task/test_emd_loss',
                                        scalar_value=(sum(ep_test_return) / self.testing_episodes), global_step=ep)
                 self.logger.add_scalar(tag='Task/test_heightmap_loss',
                                        scalar_value=(sum(ep_test_heightmap_loss) / self.testing_episodes),
@@ -123,8 +132,8 @@ class OneStepSAC(Agent):
         obs = self.env.reset()
         if render:
             self.env.render()
-        if self.total_env_step_count < self.warmup_step:
-            action = self.env.action_space.sample()
+        if self.use_demonstrations and (self.cur_ep < self.n_demonstrate_episodes):
+            action = self.gaussian_noise(self.demonstration_action)
         else:
             action = self._select_action(obs, test=test)
         obs_, reward, _, info = self.env.step(action)

@@ -30,12 +30,12 @@ class GPASAC(Agent):
         self.testing_episodes = algo_params['testing_episodes']
         self.saving_gap = algo_params['saving_gap']
 
-        self.demonstrate_skills = algo_params['demonstrate_skills']
+        self.use_demonstrations = algo_params['use_demonstrations']
         self.demonstrate_percentage = algo_params['demonstrate_percentage']
         assert 0 < self.demonstrate_percentage < 1, "Demonstrate percentage should be between 0 and 1"
         self.n_demonstrate_episodes = int(self.demonstrate_percentage * self.training_episodes)
         self.planned_skills = algo_params['planned_skills']
-        assert not (self.demonstrate_skills and self.planned_skills), "Cannot demonstrate and planned skills at the same time"
+        assert not (self.use_demonstrations and self.planned_skills), "Cannot demonstrate and planned skills at the same time"
         self.skill_plan = algo_params['skill_plan']
         self.use_planned_skills = False
 
@@ -99,7 +99,7 @@ class GPASAC(Agent):
             print("Start training...")
 
         for ep in range(self.training_episodes):
-            if self.demonstrate_skills and (ep < self.n_demonstrate_episodes):
+            if self.use_demonstrations and (ep < self.n_demonstrate_episodes):
                 self.use_planned_skills = True
             elif self.planned_skills:
                 self.use_planned_skills = True
