@@ -27,7 +27,9 @@ def smoothed_plot(file, data, x_label="Timesteps", y_label="Success rate", windo
 def smoothed_plot_multi_line(file, data, colors=None, linestyles=None, linewidths=None, alphas=None,
                              legend=None, legend_loc="upper right", window=5, title=None,
                              x_label='Timesteps', x_axis_off=False, xticks=None, xticklabels=None,
-                             y_label="Success rate", ylim=(None, None), y_axis_off=False, yticks=None, yticklabels=None):
+                             y_label="Success rate", ylim=(None, None), y_axis_off=False, yticks=None, yticklabels=None,
+                             grid=False,
+                             horizontal_lines=None, ho_linestyle='--', ho_linewidth=4, ho_xmin=0.05, ho_xmax=0.95):
     if y_axis_off:
         plt.ylabel(None)
         plt.yticks([])
@@ -64,7 +66,7 @@ def smoothed_plot_multi_line(file, data, colors=None, linestyles=None, linewidth
         if colors is None:
             c = None
         else:
-            assert len(colors) == len(data)
+            assert len(colors) >= len(data)
             c = colors[t]
 
         if linestyles is None:
@@ -87,8 +89,16 @@ def smoothed_plot_multi_line(file, data, colors=None, linestyles=None, linewidth
 
         plt.plot(x, running_avg, c=c, linestyle=ls, linewidth=linewidth, alpha=alpha)
 
+    if horizontal_lines is not None:
+        for n in range(len(horizontal_lines)):
+            plt.axhline(y=horizontal_lines[n], color=colors[len(data) + n],
+                        xmin=ho_xmin, xmax=ho_xmax, linestyle=ho_linestyle, linewidth=ho_linewidth)
+
     if legend is not None:
         plt.legend(legend, loc=legend_loc)
+
+    if grid:
+        plt.grid(True, linewidth=0.2)
 
     plt.savefig(file, bbox_inches='tight', dpi=500)
     plt.close()
