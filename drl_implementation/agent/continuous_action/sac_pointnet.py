@@ -99,30 +99,30 @@ class PointnetSAC(Agent):
                 self.logger.add_scalar(tag='System/Used GPU memory', scalar_value=GPU_memory[1], global_step=ep)
             except:
                 pass
-            print("Episode %i" % ep, "return %0.1f" % loss_info['emd_loss'],
+            print("Episode %i" % ep, "emd loss %0.1f" % loss_info['emd_loss'],
                   "heightmap loss %0.1f" % loss_info['height_map_loss'])
-            self.logging.info("Episode %i" % ep + " return %0.1f" % loss_info['emd_loss'] +
+            self.logging.info("Episode %i" % ep + " emd loss %0.1f" % loss_info['emd_loss'] +
                               " heightmap loss %0.1f" % loss_info['height_map_loss'])
             if not test and self.hindsight:
                 self.buffer.hindsight()
 
             if (ep % self.testing_gap == 0) and (ep != 0) and (not test):
-                ep_test_return = []
+                ep_test_emd_loss = []
                 ep_test_heightmap_loss = []
                 for test_ep in range(self.testing_episodes):
                     loss_info = self._interact(render, test=True)
                     self.cur_ep += 1
-                    ep_test_return.append(loss_info['emd_loss'])
+                    ep_test_emd_loss.append(loss_info['emd_loss'])
                     ep_test_heightmap_loss.append(loss_info['height_map_loss'])
                 self.logger.add_scalar(tag='Task/test_emd_loss',
-                                       scalar_value=(sum(ep_test_return) / self.testing_episodes), global_step=ep)
+                                       scalar_value=(sum(ep_test_emd_loss) / self.testing_episodes), global_step=ep)
                 self.logger.add_scalar(tag='Task/test_heightmap_loss',
                                        scalar_value=(sum(ep_test_heightmap_loss) / self.testing_episodes),
                                        global_step=ep)
-                print("Episode %i" % ep, "test return %0.1f" % (sum(ep_test_return) / self.testing_episodes),
+                print("Episode %i" % ep, "test emd loss %0.1f" % (sum(ep_test_emd_loss) / self.testing_episodes),
                       "test heightmap loss %0.1f" % (sum(ep_test_heightmap_loss) / self.testing_episodes))
                 self.logging.info(
-                    "Episode %i" % ep + " test return %0.1f" % (sum(ep_test_return) / self.testing_episodes) +
+                    "Episode %i" % ep + " test emd loss %0.1f" % (sum(ep_test_emd_loss) / self.testing_episodes) +
                     " test heightmap loss %0.1f" % (sum(ep_test_heightmap_loss) / self.testing_episodes))
 
             if (ep % self.saving_gap == 0) and (ep != 0) and (not test):
