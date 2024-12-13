@@ -76,13 +76,17 @@ class PointnetSAC(Agent):
         self.gaussian_noise = GaussianNoise(action_dim=self.action_dim, action_max=self.action_max,
                                             sigma=0.1, rng=self.rng)
 
-    def run(self, test=False, render=False, load_network_ep=None, sleep=0):
+    def run(self, test=False, render=False, load_network_ep=None, sleep=0, get_action=False):
         if test:
             num_episode = self.testing_episodes
             if load_network_ep is not None:
                 print("Loading network parameters...")
                 self._load_network(ep=load_network_ep)
             print("Start testing...")
+            if get_action:
+                obs = self.env.reset()
+                action = self._select_action(obs, test=True)
+                return action
         else:
             num_episode = self.training_episodes
             print("Start training...")
