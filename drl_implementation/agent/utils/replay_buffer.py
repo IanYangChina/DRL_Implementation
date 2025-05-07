@@ -149,12 +149,20 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                     modified_ep = []
                     for tr in range(ind + 1):
                         s = ep[tr].state
+                        modified_tr = [s]
+                        if 'agent_state' in self.Transition._fields:
+                            ag_s = ep[tr].agent_state
+                            modified_tr.append(ag_s)
                         dg = goal
+                        modified_tr.append(dg)
                         a = ep[tr].action
-                        modified_tr = [s, dg, a]
+                        modified_tr.append(a)
                         if 'next_state' in self.Transition._fields:
                             ns = ep[tr].next_state
                             modified_tr.append(ns)
+                        if 'next_agent_state' in self.Transition._fields:
+                            n_ag_s = ep[tr].next_agent_state
+                            modified_tr.append(n_ag_s)
                         ag = ep[tr].achieved_goal
                         modified_tr.append(ag)
                         r = self.reward_func(dg, ag, self.goal_distance_threshold)
@@ -183,12 +191,20 @@ class HindsightReplayBuffer(EpisodeWiseReplayBuffer):
                     modified_ep = []
                     for ind in future_inds:
                         s = ep[tr_ind].state
+                        modified_tr = [s]
+                        if 'agent_state' in self.Transition._fields:
+                            ag_s = ep[tr_ind].agent_state
+                            modified_tr.append(ag_s)
                         dg = ep[ind].achieved_goal
+                        modified_tr.append(dg)
                         a = ep[tr_ind].action
-                        modified_tr = [s, dg, a]
+                        modified_tr.append(a)
                         if 'next_state' in self.Transition._fields:
                             ns = ep[tr_ind].next_state
                             modified_tr.append(ns)
+                        if 'next_agent_state' in self.Transition._fields:
+                            n_ag_s = ep[tr_ind].next_agent_state
+                            modified_tr.append(n_ag_s)
                         ag = ep[tr_ind].achieved_goal
                         modified_tr.append(ag)
                         r = self.reward_func(dg, ag, self.goal_distance_threshold)

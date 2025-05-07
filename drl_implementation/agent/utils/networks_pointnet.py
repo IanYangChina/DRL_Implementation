@@ -6,15 +6,17 @@ from .pointnet_utils import PointNetEncoder, feature_transform_reguliarzer
 
 
 class CriticPointNet(nn.Module):
-    def __init__(self, output_dim, action_dim, normal_channel=False, softmax=False, goal_conditioned=False):
+    def __init__(self, output_dim, action_dim, agent_state_dim=0, normal_channel=False, softmax=False, goal_conditioned=False):
         super(CriticPointNet, self).__init__()
         in_channel = 6 if normal_channel else 3
+        self.action_dim = action_dim
+        self.agent_state_dim = agent_state_dim
         self.feat = PointNetEncoder(global_feat=True, feature_transform=True, channel=in_channel)
         self.goal_conditioned = goal_conditioned
         if self.goal_conditioned:
-            self.fc1 = nn.Linear(2048+action_dim, 512)
+            self.fc1 = nn.Linear(2048+action_dim+agent_state_dim, 512)
         else:
-            self.fc1 = nn.Linear(1024+action_dim, 512)
+            self.fc1 = nn.Linear(1024+action_dim+agent_state_dim, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, output_dim)
         self.dropout = nn.Dropout(p=0.4)
@@ -22,11 +24,14 @@ class CriticPointNet(nn.Module):
         self.bn2 = nn.BatchNorm1d(256)
         self.softmax = softmax
 
-    def forward(self, obs_xyz, action, goal_xyz=None):
+    def forward(self, obs_xyz, action, goal_xyz=None, agent_state=None):
         x, trans, trans_feat = self.feat(obs_xyz)
         if self.goal_conditioned and goal_xyz is not None:
             goal_x, goal_trans, goal_trans_feat = self.feat(goal_xyz)
             x = T.cat([x, goal_x.detach()], dim=1)
+            if agent_state is not None:
+                assert agent_state.shape[1] == self.agent_state_dim
+                x = T.cat([x, agent_state], dim=1)
         x = T.cat([x, action], dim=1)
         x = F.relu(self.bn1(self.fc1(x)))
         x = F.relu(self.bn2(self.dropout(self.fc2(x))))
